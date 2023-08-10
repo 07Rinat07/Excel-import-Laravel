@@ -51,7 +51,7 @@ class ProjectImport implements ToCollection, WithHeadingRow, WithValidation, Ski
         return [
             'tip' => 'required|string',
             'naimenovanie' => 'required|string',
-            'data_sozdaniia' => 'required|integer',
+            'data_sozdaniia' => 'required|string', //для тета временно сделал из integer - string
             'podpisanie_dogovora' => 'required|integer',
             'dedlain' => 'nullable|integer',
             'setevik' => 'nullable|string',
@@ -70,8 +70,18 @@ class ProjectImport implements ToCollection, WithHeadingRow, WithValidation, Ski
         ];
     }
 
-    public function onFailure(Failure ...$failures)
+    public function onFailure(Failure ...$failures): void
     {
-        // TODO: Implement onFailure() method.
+        $map = [];
+        foreach ($failures as $failure) {
+            foreach ($failure->errors() as $error) {
+                $map[] = [
+                    'key' => $failure->attribute(),
+                    'row' => $failure->row(),
+                    'message' => $error,
+                ];
+            }
+        }
+        dd($map);
     }
 }
