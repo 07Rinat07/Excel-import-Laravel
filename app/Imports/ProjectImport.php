@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Factory\ProjectFactory;
+use App\Models\FailedRow;
 use App\Models\Project;
 use App\Models\Type;
 use Illuminate\Support\Collection;
@@ -51,7 +52,7 @@ class ProjectImport implements ToCollection, WithHeadingRow, WithValidation, Ski
         return [
             'tip' => 'required|string',
             'naimenovanie' => 'required|string',
-            'data_sozdaniia' => 'required|string', //для тета временно сделал из integer - string
+            'data_sozdaniia' => 'required|integer',
             'podpisanie_dogovora' => 'required|integer',
             'dedlain' => 'nullable|integer',
             'setevik' => 'nullable|string',
@@ -79,9 +80,11 @@ class ProjectImport implements ToCollection, WithHeadingRow, WithValidation, Ski
                     'key' => $failure->attribute(),
                     'row' => $failure->row(),
                     'message' => $error,
+                    'task_id' => 1 // времено захаркодил
                 ];
             }
         }
-        dd($map);
+        if (count($map) >0) FailedRow::insertFailedRows($map);
     }
+
 }
