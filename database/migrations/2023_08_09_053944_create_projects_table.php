@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('title');
             $table->date('created_at_time');
             $table->date('contracted_at');
-            $table->date('deadline')->nullable();
+            $table->date('dead_line')->nullable();
             $table->boolean('is_chain')->nullable();
             $table->boolean('is_on_time')->nullable();
             $table->boolean('has_outsource')->nullable();
