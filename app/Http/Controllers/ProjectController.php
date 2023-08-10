@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Project\ImportStoreRequest;
+use App\Jobs\ImportProjectExcelFileJob;
 use App\Models\File;
-use Illuminate\Support\Facades\Storage;
 
 class ProjectController extends Controller
 {
@@ -23,5 +23,7 @@ class ProjectController extends Controller
         $data = $request->validated();
 
         $path = File::putAndCreate($data['file']);
+
+        ImportProjectExcelFileJob::dispatchNow($path);
     }
 }
