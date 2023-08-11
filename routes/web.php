@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -35,10 +34,12 @@ Route::get('/dashboard', function () {
 //    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 //});
 
-Route::get('/projects', [\App\Http\Controllers\ProjectController::class, 'index'])->name('project.index');
-Route::get('/projects/import', [\App\Http\Controllers\ProjectController::class, 'import'])->name('project.import');
-Route::post('/projects/import', [\App\Http\Controllers\ProjectController::class, 'importStore'])->name('project.import.store');
-Route::get('/tasks', [\App\Http\Controllers\TaskController::class, 'index'])->name('task.index');
+Route::group(['[ middleware' => 'auth'], function () {
+    Route::get('/projects', [\App\Http\Controllers\ProjectController::class, 'index'])->name('project.index');
+    Route::get('/projects/import', [\App\Http\Controllers\ProjectController::class, 'import'])->name('project.import');
+    Route::post('/projects/import', [\App\Http\Controllers\ProjectController::class, 'importStore'])->name('project.import.store');
+    Route::get('/tasks', [\App\Http\Controllers\TaskController::class, 'index'])->name('task.index');
 
+});
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';
