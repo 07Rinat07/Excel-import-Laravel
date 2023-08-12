@@ -14,6 +14,7 @@
 ### To run the project locally, you need to type commands in the terminal in turn ==>
 * php artisan serve
 * vite
+* php artisan queue:work --queue=imports
 
 ### For Unit-Feature tests:
 * cp .env .env.testing
