@@ -3,15 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Project\ImportStoreRequest;
+use App\Http\Resources\Project\ProjectResource;
 use App\Jobs\ImportProjectExcelFileJob;
 use App\Models\File;
+use App\Models\Project;
 use App\Models\Task;
 
 class ProjectController extends Controller
 {
     public function index()
     {
-        return inertia('Project/Index');
+        $projects = Project::paginate(10);
+        $projects = ProjectResource::collection($projects);
+        return inertia('Project/Index', compact('projects'));
     }
 
     public function import()

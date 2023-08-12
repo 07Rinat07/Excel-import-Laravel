@@ -12,7 +12,7 @@ class ProjectFactory
     private $title;
     private $createdAtTime;
     private $contractedAt;
-    private $deadLine;
+    private $deadline;
     private $isChain;
     private $isOnTime;
     private $hasOutsource;
@@ -31,7 +31,7 @@ class ProjectFactory
      * @param $title
      * @param $createdAtTime
      * @param $contractedAt
-     * @param $deadLine
+     * @param $deadline
      * @param $isChain
      * @param $isOnTime
      * @param $hasOutsource
@@ -45,13 +45,13 @@ class ProjectFactory
      * @param $comment
      * @param $effectiveValue
      */
-    public function __construct($typeId, $title, $createdAtTime, $contractedAt, $deadLine, $isChain, $isOnTime, $hasOutsource, $hasInvestors, $workerCount, $serviceCount, $paymentFirstStep, $paymentSecondStep, $paymentThirdStep, $paymentForthStep, $comment, $effectiveValue)
+    public function __construct($typeId, $title, $createdAtTime, $contractedAt, $deadline, $isChain, $isOnTime, $hasOutsource, $hasInvestors, $workerCount, $serviceCount, $paymentFirstStep, $paymentSecondStep, $paymentThirdStep, $paymentForthStep, $comment, $effectiveValue)
     {
         $this->typeId = $typeId;
         $this->title = $title;
         $this->createdAtTime = $createdAtTime;
         $this->contractedAt = $contractedAt;
-        $this->deadLine = $deadLine;
+        $this->deadline = $deadline;
         $this->isChain = $isChain;
         $this->isOnTime = $isOnTime;
         $this->hasOutsource = $hasOutsource;
