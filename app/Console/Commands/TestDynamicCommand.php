@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Imports\ProjectDynamicImport;
-use App\Imports\ProjectImport;
 use App\Models\Task;
 use Illuminate\Console\Command;
 use Maatwebsite\Excel\Facades\Excel;
@@ -15,7 +14,7 @@ class TestDynamicCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'test2';
+    protected $signature = 'test';
 
     /**
      * The console command description.
@@ -31,7 +30,7 @@ class TestDynamicCommand extends Command
      */
     public function handle()
     {
-        Excel::import(new ProjectDynamicImport(Task::find(4)), 'files/projects2.xlsx', 'public');
+        Excel::import(new ProjectDynamicImport(Task::find(1)), 'files/projects2.xlsx', 'public');
         return Command::SUCCESS;
     }
 }
