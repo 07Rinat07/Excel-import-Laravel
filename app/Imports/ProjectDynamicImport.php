@@ -2,26 +2,33 @@
 
 namespace App\Imports;
 
-use App\Factory\ProjectFactory;
+use App\Factory\ProjectDynamicFactory;
 use App\Models\FailedRow;
+use App\Models\Payment;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\Type;
 use Illuminate\Support\Collection;
+use Maatwebsite\Excel\Concerns\RegistersEventListeners;
 use Maatwebsite\Excel\Concerns\SkipsOnFailure;
 use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithStartRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
+use Maatwebsite\Excel\Events\BeforeSheet;
 use Maatwebsite\Excel\Validators\Failure;
 
-class ProjectDynamicImport implements ToCollection, WithValidation, SkipsOnFailure
+class ProjectDynamicImport implements ToCollection, WithValidation, SkipsOnFailure, WithStartRow, WithEvents
 {
+    use RegistersEventListeners;
     private Task $task;
+    private static array $headings;
 
     /**
      * @param $task
      */
 
-   const STATIC_ROW = 12; // в таблице это статика значения порядка в файле эксель в моем
+    const STATIC_ROW = 12;
 
     public function __construct($task)
     {
@@ -39,6 +46,35 @@ class ProjectDynamicImport implements ToCollection, WithValidation, SkipsOnFailu
         foreach ($collection as $row) {
 
             if (!isset($row[1])) continue;
+
+            $map = $this->getRowsMap($row);
+
+            $projectFactory = ProjectDynamicFactory::make($typesMap, $map['static']);
+
+            $project = Project::updateOrCreate([
+                'type_id' => $projectFactory->getValues()['type_id'],
+                'title' => $projectFactory->getValues()['title'],
+                'created_at_time' => $projectFactory->getValues()['created_at_time'],
+                'contracted_at' => $projectFactory->getValues()['contracted_at'],
+            ], $projectFactory->getValues());
+
+
+
+
+            if (!isset($map['dynamic'])) continue;
+
+
+
+            $dynamicHeadings = $this->getRowsMap(self::$headings)['dynamic'];
+
+            foreach ($map['dynamic'] as $key => $item) {
+
+                Payment::create([
+                    'project_id' => $project->id,
+                    'title' => $dynamicHeadings[$key],
+                    'value' => $item,
+                ]);
+            }
         }
     }
 
@@ -49,6 +85,21 @@ class ProjectDynamicImport implements ToCollection, WithValidation, SkipsOnFailu
             $map[$type->title] = $type->id;
         }
         return $map;
+    }
+
+    private function getRowsMap($row)
+    {
+        $static = [];
+        $dynamic = [];
+        foreach ($row as $key => $value) {
+            if ($value) {
+                $key > 12 ? $dynamic[$key] = $value : $static[$key] = $value;
+            }
+        }
+        return [
+            'static' => $static,
+            'dynamic' => $dynamic,
+        ];
     }
 
     public function rules(): array
@@ -112,5 +163,14 @@ class ProjectDynamicImport implements ToCollection, WithValidation, SkipsOnFailu
             'kommentarii' => 'Комментарий',
             'znacenie_effektivnosti' => 'Значение эффективности',
         ];
+    }
+
+    public function startRow(): int
+    {
+        return 2; // тут указал что бы в типе брал со второй строки
+    }
+    public static function beforeSheet(BeforeSheet $event)
+    {
+        self::$headings = $event->getSheet()->getDelegate()->toArray()[0];
     }
 }
