@@ -3,18 +3,15 @@
 namespace App\Http\Requests\Project;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\ValidationException;
 
 class ImportStoreRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
-     *
-     * @return bool
      */
     public function authorize(): bool
     {
-        return true;
+        return $this->user() !== null;
     }
 
     /**
@@ -24,13 +21,17 @@ class ImportStoreRequest extends FormRequest
      */
     public function rules(): array
     {
-        if (!in_array($this->file->getClientOriginalExtension(), ['xlsx'])) {
-            throw ValidationException::withMessages(['Incorrect file extension']);
-        }
-
         return [
-            'file' => 'required|file',
-            'type' => 'required|integer|in:1,2',
+            'file' => 'required|file|mimes:xlsx,csv,tsv,txt|max:10240',
+            'type_id' => 'required|integer|exists:types,id',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'file.mimes' => 'The file must be an .xlsx, .csv or .tsv document.',
+            'file.max' => 'The file size must not exceed 10MB.',
         ];
     }
 }

@@ -22,8 +22,6 @@ class FailedRowResource extends JsonResource
             'task_id' => $this->task_id,
             'created_at' => $this->created_at->format('Y-m-d'),
 
-
-
         ];
     }
 }

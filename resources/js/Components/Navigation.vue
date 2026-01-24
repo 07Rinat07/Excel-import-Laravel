@@ -9,19 +9,31 @@
                             <Link :class="['px-3 py-2 text-sm font-medium', $page.component === 'Project/Index'
                             ? 'bg-gray-900 text-white'
                             : 'text-gray-300 hover:bg-gray-700 hover:text-white']" :href="route('project.index')">
-                                Projects
+                                {{ $t('nav.projects') }}
                             </Link>
                             <Link :class="['px-3 py-2 text-sm font-medium', $page.component === 'Project/Import'
                             ? 'bg-gray-900 text-white'
                             : 'text-gray-300 hover:bg-gray-700 hover:text-white']" :href="route('project.import')">
-                                Import
+                                {{ $t('nav.imports') }}
                             </Link>
                             <Link :class="['px-3 py-2 text-sm font-medium', $page.component === 'Task/Index'
                             ? 'bg-gray-900 text-white'
                             : 'text-gray-300 hover:bg-gray-700 hover:text-white']" :href="route('task.index')">
-                                Tasks
+                                {{ $t('nav.tasks') }}
+                            </Link>
+                            <Link
+                                v-if="$page.props.auth.user && $page.props.auth.user.is_admin"
+                                :class="['px-3 py-2 text-sm font-medium', $page.component === 'Admin/Feedback/Index'
+                                ? 'bg-gray-900 text-white'
+                                : 'text-gray-300 hover:bg-gray-700 hover:text-white']"
+                                :href="route('admin.feedback.index')"
+                            >
+                                {{ $t('nav.feedback') }}
                             </Link>
                         </div>
+                    </div>
+                    <div class="hidden sm:block">
+                        <LanguageSwitcher />
                     </div>
                 </div>
             </div>
@@ -29,15 +41,34 @@
             <!-- Mobile menu, show/hide based on menu state. -->
             <div class="sm:hidden" id="mobile-menu">
                 <div class="space-y-1 px-2 pb-3 pt-2">
-                    <!-- Current: "bg-gray-900 text-white", Default: "text-gray-300 hover:bg-gray-700 hover:text-white" -->
-                    <a href="#" class="bg-gray-900 text-white block rounded-md px-3 py-2 text-base font-medium"
-                       aria-current="page">Dashboard</a>
-                    <a href="#"
-                       class="text-gray-300 hover:bg-gray-700 hover:text-white block rounded-md px-3 py-2 text-base font-medium">Team</a>
-                    <a href="#"
-                       class="text-gray-300 hover:bg-gray-700 hover:text-white block rounded-md px-3 py-2 text-base font-medium">Projects</a>
-                    <a href="#"
-                       class="text-gray-300 hover:bg-gray-700 hover:text-white block rounded-md px-3 py-2 text-base font-medium">Calendar</a>
+                    <div class="px-2 py-2">
+                        <LanguageSwitcher />
+                    </div>
+                    <Link
+                        :href="route('project.index')"
+                        class="block rounded-md px-3 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-white"
+                    >
+                        {{ $t('nav.projects') }}
+                    </Link>
+                    <Link
+                        :href="route('project.import')"
+                        class="block rounded-md px-3 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-white"
+                    >
+                        {{ $t('nav.imports') }}
+                    </Link>
+                    <Link
+                        :href="route('task.index')"
+                        class="block rounded-md px-3 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-white"
+                    >
+                        {{ $t('nav.tasks') }}
+                    </Link>
+                    <Link
+                        v-if="$page.props.auth.user && $page.props.auth.user.is_admin"
+                        :href="route('admin.feedback.index')"
+                        class="block rounded-md px-3 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-white"
+                    >
+                        {{ $t('nav.feedback') }}
+                    </Link>
                 </div>
             </div>
         </nav>
@@ -47,12 +78,14 @@
 
 <script>
 import {Link} from "@inertiajs/vue3";
+import LanguageSwitcher from '@/Components/LanguageSwitcher.vue';
 
 export default {
     name: "Navigation",
 
     components: {
-        Link
+        Link,
+        LanguageSwitcher
     }
 }
 </script>

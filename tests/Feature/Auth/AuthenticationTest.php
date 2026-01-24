@@ -42,4 +42,20 @@ class AuthenticationTest extends TestCase
 
         $this->assertGuest();
     }
+
+    public function test_blocked_user_cannot_authenticate(): void
+    {
+        $user = User::factory()->create([
+            'password' => bcrypt('password'),
+            'is_blocked' => true,
+        ]);
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $response->assertSessionHasErrors('email');
+        $this->assertGuest();
+    }
 }

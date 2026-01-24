@@ -2,31 +2,27 @@
 
 namespace App\Jobs;
 
-use App\Imports\ProjectDynamicImport;
-use App\Imports\ProjectImport;
 use App\Models\Task;
+use App\Services\ProjectImportServiceInterface;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Maatwebsite\Excel\Facades\Excel;
+use Throwable;
 
 class ImportProjectExcelFileJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    private $path;
-    private $task;
+    private string $path;
+
+    private Task $task;
 
     /**
      * Create a new job instance.
-     *
-     * @param $path
-     * @param $task
      */
-    public function __construct($path, $task)
+    public function __construct(string $path, Task $task)
     {
         $this->path = $path;
         $this->task = $task;
@@ -34,23 +30,24 @@ class ImportProjectExcelFileJob implements ShouldQueue
 
     /**
      * Execute the job.
-     *
-     * @return void
      */
-    public function handle()
+    public function handle(ProjectImportServiceInterface $importService): void
     {
-        $this->task->update(['status' => Task::STATUS_SUCCESS]);
+        $this->task->refresh();
+        $this->task->update(['status' => Task::STATUS_PROCESS]);
 
-        $methodName = 'import' . $this->task->type;
-        $this->$methodName();
-    }
+        try {
+            $importService->import($this->task, $this->path);
+        } catch (Throwable $exception) {
+            $this->task->update(['status' => Task::STATUS_ERROR]);
+            report($exception);
 
-    public function import1()
-    {
-        Excel::import(new ProjectImport($this->task), $this->path, 'public');
-    }
-    public function import2()
-    {
-        Excel::import(new ProjectDynamicImport($this->task), $this->path, 'public');
+            return;
+        }
+
+        $this->task->refresh();
+        if ($this->task->status === Task::STATUS_PROCESS) {
+            $this->task->update(['status' => Task::STATUS_SUCCESS]);
+        }
     }
 }

@@ -10,24 +10,25 @@ class ProjectResource extends JsonResource
     /**
      * Transform the resource into an array.
      *
-     * @param \Illuminate\Http\Request $request
+     * @param  \Illuminate\Http\Request  $request
      * @return array|\Illuminate\Contracts\Support\Arrayable|\JsonSerializable
      */
     public function toArray($request)
     {
+        $values = $this->values->mapWithKeys(function ($value) {
+            $key = $value->column?->key ?? $value->template_column_id;
+
+            return [$key => $value->value];
+        });
+
         return [
             'id' => $this->id,
             'type' => new TypeResource($this->type),
             'title' => $this->title,
-            'created_at_time' => $this->created_at_time,
-            'contracted_at' => isset($this->contracted_at) ? $this->contracted_at->format('Y-m-d') : '',
-            'deadline' => isset($this->deadline) ? $this->deadline->format('Y-m-d') : '',
-            'is_chain' => $this->is_chain ? 'Да' : 'Нет',
-            'is_on_time' => $this->is_on_time ? 'Да' : 'Нет',
-            'has_outsource' => $this->has_outsource ? 'Да' : 'Нет',
-            'has_investors' => $this->has_investors ? 'Да' : 'Нет',
-            'worker_count' => $this->worker_count,
-            'service_count' => $this->service_count,
+            'row_index' => $this->row_index,
+            'task_id' => $this->task_id,
+            'template_id' => $this->template_id,
+            'values' => $values,
         ];
     }
 }

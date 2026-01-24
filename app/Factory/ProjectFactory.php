@@ -9,42 +9,39 @@ use PhpOffice\PhpSpreadsheet\Shared\Date;
 class ProjectFactory
 {
     private $typeId;
+
     private $title;
+
     private $createdAtTime;
+
     private $contractedAt;
+
     private $deadline;
+
     private $isChain;
+
     private $isOnTime;
+
     private $hasOutsource;
+
     private $hasInvestors;
+
     private $workerCount;
+
     private $serviceCount;
+
     private $paymentFirstStep;
+
     private $paymentSecondStep;
+
     private $paymentThirdStep;
+
     private $paymentForthStep;
+
     private $comment;
+
     private $effectiveValue;
 
-    /**
-     * @param $typeId
-     * @param $title
-     * @param $createdAtTime
-     * @param $contractedAt
-     * @param $deadline
-     * @param $isChain
-     * @param $isOnTime
-     * @param $hasOutsource
-     * @param $hasInvestors
-     * @param $workerCount
-     * @param $serviceCount
-     * @param $paymentFirstStep
-     * @param $paymentSecondStep
-     * @param $paymentThirdStep
-     * @param $paymentForthStep
-     * @param $comment
-     * @param $effectiveValue
-     */
     public function __construct($typeId, $title, $createdAtTime, $contractedAt, $deadline, $isChain, $isOnTime, $hasOutsource, $hasInvestors, $workerCount, $serviceCount, $paymentFirstStep, $paymentSecondStep, $paymentThirdStep, $paymentForthStep, $comment, $effectiveValue)
     {
         $this->typeId = $typeId;
@@ -71,9 +68,9 @@ class ProjectFactory
         return new self(
             self::getTypeId($map, $row['tip']),
             $row['naimenovanie'],
-            Date:: excelToDateTimeObject($row['data_sozdaniia']),
-            Date:: excelToDateTimeObject($row['podpisanie_dogovora']),
-            isset($row['dedlain']) ? Date:: excelToDateTimeObject($row['dedlain']) : null,
+            Date::excelToDateTimeObject($row['data_sozdaniia']),
+            Date::excelToDateTimeObject($row['podpisanie_dogovora']),
+            isset($row['dedlain']) ? Date::excelToDateTimeObject($row['dedlain']) : null,
             isset($row['setevik']) ? self::getBool($row['setevik']) : null,
             isset($row['sdaca_v_srok']) ? self::getBool($row['sdaca_v_srok']) : null,
             isset($row['nalicie_autsorsinga']) ? self::getBool($row['nalicie_autsorsinga']) : null,
@@ -104,8 +101,9 @@ class ProjectFactory
         $props = get_object_vars($this);
         $res = [];
         foreach ($props as $key => $prop) {
-          $res[Str::snake($key)] = $prop;
+            $res[Str::snake($key)] = $prop;
         }
+
         return $res;
 
     }

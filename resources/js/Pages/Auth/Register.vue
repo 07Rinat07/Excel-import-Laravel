@@ -23,11 +23,15 @@ const submit = () => {
 
 <template>
     <GuestLayout>
-        <Head title="Register" />
+        <Head :title="$t('auth.registerTitle')" />
+
+        <div class="mb-4 text-sm text-gray-600">
+            {{ $t('auth.registerSubtitle') }}
+        </div>
 
         <form @submit.prevent="submit">
             <div>
-                <InputLabel for="name" value="Имя" />
+                <InputLabel for="name" :value="$t('labels.name')" />
 
                 <TextInput
                     id="name"
@@ -43,7 +47,7 @@ const submit = () => {
             </div>
 
             <div class="mt-4">
-                <InputLabel for="email" value="Ваша эл.почта" />
+                <InputLabel for="email" :value="$t('labels.email')" />
 
                 <TextInput
                     id="email"
@@ -58,7 +62,7 @@ const submit = () => {
             </div>
 
             <div class="mt-4">
-                <InputLabel for="password" value="Ваш пароль" />
+                <InputLabel for="password" :value="$t('labels.password')" />
 
                 <TextInput
                     id="password"
@@ -73,7 +77,7 @@ const submit = () => {
             </div>
 
             <div class="mt-4">
-                <InputLabel for="password_confirmation" value="Подтвердите свой пароль" />
+                <InputLabel for="password_confirmation" :value="$t('labels.passwordConfirm')" />
 
                 <TextInput
                     id="password_confirmation"
@@ -92,11 +96,11 @@ const submit = () => {
                     :href="route('login')"
                     class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
-                    Вы уже тут зарегистрированы?
+                    {{ $t('auth.haveAccount') }}
                 </Link>
 
                 <PrimaryButton class="ml-4" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                    Регистрировать
+                    {{ $t('actions.register') }}
                 </PrimaryButton>
             </div>
         </form>

@@ -1,131 +1,263 @@
 <template>
-    <div>
-        Index
+    <div class="space-y-8">
+        <Head :title="$t('labels.importedRecords')" />
 
-        <div>
-            <Link class="text-sm" :href="route('task.index')">Back </Link>
-        </div>
-        <div v-if="projects" class="mt-4 -mb-3">
-            <div class="not-prose relative bg-slate-50 rounded-xl overflow-hidden dark:bg-slate-800/25">
-                <div style="background-position:10px 10px"
-                     class="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,#fff,rgba(255,255,255,0.6))] dark:bg-grid-slate-700/25 dark:[mask-image:linear-gradient(0deg,rgba(255,255,255,0.1),rgba(255,255,255,0.5))]"></div>
-                <div class="relative rounded-xl overflow-auto">
-                    <div class="shadow-sm overflow-auto my-8">
-                        <table class="border-collapse table-auto w-full text-sm">
-                            <thead>
-                            <tr>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pl-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Id
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Type
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Title
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pr-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Created_at_time
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pr-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Contracted_at
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pr-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Deadline
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Is_chain
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pr-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Is_on_time
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pr-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Has_outsource
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pr-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Has_investors
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pr-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Worker_count
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pr-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Service_count
-                                </th>
-                            </tr>
-                            </thead>
-                            <tbody class="bg-white dark:bg-slate-800">
-                            <tr v-for="project in projects.data">
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pl-8 text-slate-500 dark:text-slate-400">
-                                    {{ project.id }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pl-8 text-slate-500 dark:text-slate-400">
-                                    {{ project.type.title }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pl-8 text-slate-500 dark:text-slate-400">
-                                    {{ project.title }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 text-slate-500 dark:text-slate-400">
-                                    {{ project.created_at_time }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pr-8 text-slate-500 dark:text-slate-400">
-                                    {{ project.contracted_at }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pr-8 text-slate-500 dark:text-slate-400">
-                                    {{ project.deadline}}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pl-8 text-slate-500 dark:text-slate-400">
-                                    {{ project.is_chain }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pl-8 text-slate-500 dark:text-slate-400">
-                                    {{ project.is_on_time }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 text-slate-500 dark:text-slate-400">
-                                    {{ project.has_outsource }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pr-8 text-slate-500 dark:text-slate-400">
-                                    {{ project.has_investors }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pr-8 text-slate-500 dark:text-slate-400">
-                                    {{ project.worker_count}}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pr-8 text-slate-500 dark:text-slate-400">
-                                    {{ project.service_count}}
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
+        <header class="flex flex-wrap items-center justify-between gap-4">
+            <div>
+                <p class="text-sm uppercase tracking-[0.2em] text-slate-500">{{ $t('labels.dataHub') }}</p>
+                <h1 class="text-2xl sm:text-3xl font-semibold text-slate-900">{{ $t('labels.importedRecords') }}</h1>
+                <p class="mt-2 text-sm text-slate-600">
+                    {{ $t('project.filtersTitle') }}
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <Link class="w-full sm:w-auto rounded-full border border-slate-300 px-4 py-2 text-center text-xs font-semibold text-slate-700" :href="route('project.import')">
+                    {{ $t('actions.newImport') }}
+                </Link>
+                <Link
+                    v-if="form.task_id"
+                    class="w-full sm:w-auto rounded-full bg-slate-900 px-4 py-2 text-center text-xs font-semibold text-white"
+                    :href="route('task.export', { task: form.task_id, format: 'xlsx' })"
+                >
+                    {{ $t('labels.exportTaskXlsx') }}
+                </Link>
+                <Link
+                    v-if="form.task_id"
+                    class="w-full sm:w-auto rounded-full border border-slate-300 px-4 py-2 text-center text-xs font-semibold text-slate-700"
+                    :href="route('task.export', { task: form.task_id, format: 'csv' })"
+                >
+                    {{ $t('labels.exportTaskCsv') }}
+                </Link>
+                <Link
+                    v-if="form.type_id"
+                    class="w-full sm:w-auto rounded-full bg-slate-900 px-4 py-2 text-center text-xs font-semibold text-white"
+                    :href="route('type.export', { type: form.type_id, format: 'xlsx' })"
+                >
+                    {{ $t('labels.exportTypeXlsx') }}
+                </Link>
+                <Link
+                    v-if="form.type_id"
+                    class="w-full sm:w-auto rounded-full border border-slate-300 px-4 py-2 text-center text-xs font-semibold text-slate-700"
+                    :href="route('type.export', { type: form.type_id, format: 'csv' })"
+                >
+                    {{ $t('labels.exportTypeCsv') }}
+                </Link>
+            </div>
+        </header>
+
+        <section class="rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-lg shadow-slate-200/40">
+            <form class="grid gap-4 lg:grid-cols-4" @submit.prevent="applyFilters">
+                <div>
+                    <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('labels.type') }}</label>
+                    <select v-model="form.type_id" class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
+                        <option value="">—</option>
+                        <option v-for="type in types" :key="type.id" :value="type.id">
+                            {{ type.title }}
+                        </option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('labels.task') }}</label>
+                    <select v-model="form.task_id" class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
+                        <option value="">—</option>
+                        <option v-for="task in tasks" :key="task.id" :value="task.id">
+                            #{{ task.id }} — {{ task.label }}
+                        </option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('labels.template') }}</label>
+                    <select v-model="form.template_id" class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
+                        <option value="">—</option>
+                        <option v-for="template in templates" :key="template.id" :value="template.id">
+                            {{ template.name }}
+                        </option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('labels.search') }}</label>
+                    <input v-model="form.q" class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" type="search" :placeholder="$t('labels.searchPlaceholder')" />
+                </div>
+
+                <div v-if="columns.length" class="lg:col-span-4">
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('labels.filters') }}</p>
+                    <div class="mt-3 grid gap-3 lg:grid-cols-3">
+                        <div v-for="column in columns" :key="column.key">
+                            <label class="text-xs font-medium text-slate-600">{{ column.label }}</label>
+                            <input
+                                v-model="form.columns[column.key]"
+                                class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                                type="text"
+                                :placeholder="$t('labels.filterPlaceholder', { label: column.label })"
+                            />
+                        </div>
                     </div>
                 </div>
-                <div class="absolute inset-0 pointer-events-none border border-black/5 rounded-xl dark:border-white/5">
+
+                <div class="lg:col-span-4 flex flex-wrap gap-2">
+                    <button class="w-full sm:w-auto rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white" type="submit">
+                        {{ $t('actions.applyFilters') }}
+                    </button>
+                    <button class="w-full sm:w-auto rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700" type="button" @click="resetFilters">
+                        {{ $t('actions.resetFilters') }}
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <section class="rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-lg shadow-slate-200/40">
+            <div v-if="projects.data.length === 0" class="text-center text-sm text-slate-600">
+                {{ $t('project.noRecords') }}
+            </div>
+            <div v-else class="space-y-6">
+                <div class="space-y-4 sm:hidden">
+                    <div v-for="project in projects.data" :key="project.id" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">ID</p>
+                                <p class="text-lg font-semibold text-slate-900">#{{ project.id }}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">{{ $t('project.tableRow') }}</p>
+                                <p class="text-sm text-slate-600">{{ project.row_index || '—' }}</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-3 grid gap-2 text-sm">
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">{{ $t('project.tableTitle') }}</span>
+                                <span class="text-slate-700 text-right">{{ project.title || '—' }}</span>
+                            </div>
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">{{ $t('project.tableType') }}</span>
+                                <span class="text-slate-700 text-right">{{ project.type?.title || '—' }}</span>
+                            </div>
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">{{ $t('project.tableTask') }}</span>
+                                <span class="text-slate-700 text-right">{{ project.task_id || '—' }}</span>
+                            </div>
+                        </div>
+
+                        <div v-if="columns.length" class="mt-4 space-y-2">
+                            <div v-for="column in columns" :key="column.key" class="flex items-start justify-between gap-3 text-xs">
+                                <span class="text-slate-500">{{ column.label }}</span>
+                                <span class="text-slate-800 text-right">{{ project.values?.[column.key] ?? '—' }}</span>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            <Link class="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700" :href="route('project.export', { project: project.id, format: 'xlsx' })">
+                                XLSX
+                            </Link>
+                            <Link class="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700" :href="route('project.export', { project: project.id, format: 'csv' })">
+                                CSV
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hidden sm:block overflow-x-auto">
+                    <table class="min-w-[720px] text-xs sm:text-sm">
+                    <thead>
+                        <tr class="text-left text-slate-500">
+                            <th class="pb-3 pr-6">ID</th>
+                            <th class="pb-3 pr-6">{{ $t('project.tableRow') }}</th>
+                            <th class="pb-3 pr-6">{{ $t('project.tableType') }}</th>
+                            <th class="pb-3 pr-6">{{ $t('project.tableTask') }}</th>
+                            <th class="pb-3 pr-6">{{ $t('project.tableTitle') }}</th>
+                            <th v-for="column in columns" :key="column.key" class="pb-3 pr-6">
+                                {{ column.label }}
+                            </th>
+                            <th class="pb-3 text-right">{{ $t('project.tableExport') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="project in projects.data" :key="project.id" class="border-t border-slate-200">
+                            <td class="py-4 pr-6 font-semibold text-slate-900">#{{ project.id }}</td>
+                            <td class="py-4 pr-6 text-slate-600">{{ project.row_index || '—' }}</td>
+                            <td class="py-4 pr-6 text-slate-600">{{ project.type?.title || '—' }}</td>
+                            <td class="py-4 pr-6 text-slate-600">{{ project.task_id || '—' }}</td>
+                            <td class="py-4 pr-6 text-slate-600">{{ project.title || '—' }}</td>
+                            <td v-for="column in columns" :key="column.key" class="py-4 pr-6 text-slate-600">
+                                {{ project.values?.[column.key] ?? '—' }}
+                            </td>
+                            <td class="py-4 text-right">
+                                <div class="flex flex-wrap justify-end gap-2">
+                                    <Link class="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700" :href="route('project.export', { project: project.id, format: 'xlsx' })">
+                                        XLSX
+                                    </Link>
+                                    <Link class="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700" :href="route('project.export', { project: project.id, format: 'csv' })">
+                                        CSV
+                                    </Link>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                    </table>
                 </div>
             </div>
-        </div>
-        <div>
-            <pagination :meta="projects.meta"></pagination>
-        </div>
+        </section>
+
+        <Pagination :meta="projects.meta" />
     </div>
 </template>
 
 
 <script>
-import MainLayout from "@/Layouts/MainLayout.vue";
-
-import Pagination from "@/Components/Pagination.vue";
+import AdminLayout from '@/Layouts/AdminLayout.vue';
+import Pagination from '@/Components/Pagination.vue';
+import { Head, Link } from '@inertiajs/vue3';
 
 export default {
-    name: "Index",
+    name: 'ProjectIndex',
+    layout: AdminLayout,
     components: {
+        Head,
+        Link,
         Pagination,
     },
-
-    layout: MainLayout,
-
-    props: [
-        'projects'
-    ],
-}
+    props: {
+        projects: Object,
+        types: Array,
+        tasks: Array,
+        templates: Array,
+        columns: Array,
+        filters: Object,
+    },
+    data() {
+        return {
+            form: {
+                type_id: this.filters?.type_id ?? '',
+                task_id: this.filters?.task_id ?? '',
+                template_id: this.filters?.template_id ?? '',
+                q: this.filters?.q ?? '',
+                columns: { ...(this.filters?.columns ?? {}) },
+            },
+        };
+    },
+    methods: {
+        applyFilters() {
+            this.$inertia.get(route('project.index'), {
+                type_id: this.form.type_id || undefined,
+                task_id: this.form.task_id || undefined,
+                template_id: this.form.template_id || undefined,
+                q: this.form.q || undefined,
+                filters: this.form.columns,
+            }, {
+                preserveState: true,
+                replace: true,
+            });
+        },
+        resetFilters() {
+            this.form = {
+                type_id: '',
+                task_id: '',
+                template_id: '',
+                q: '',
+                columns: {},
+            };
+            this.applyFilters();
+        },
+    },
+};
 </script>
-
-
-<style scoped>
-
-</style>

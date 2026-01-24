@@ -2,10 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Imports\ProjectDynamicImport;
 use App\Models\Task;
+use App\Services\ProjectImportServiceInterface;
 use Illuminate\Console\Command;
-use Maatwebsite\Excel\Facades\Excel;
 
 class TestDynamicCommand extends Command
 {
@@ -14,14 +13,14 @@ class TestDynamicCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'test';
+    protected $signature = 'imports:test {task_id=1} {path=files/projects2.xlsx}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'for test and run myCommand';
+    protected $description = 'Run a project import against a local file for testing.';
 
     /**
      * Execute the console command.
@@ -30,7 +29,12 @@ class TestDynamicCommand extends Command
      */
     public function handle()
     {
-        Excel::import(new ProjectDynamicImport(Task::find(1)), 'files/projects2.xlsx', 'public');
+        $taskId = (int) $this->argument('task_id');
+        $path = (string) $this->argument('path');
+
+        $task = Task::findOrFail($taskId);
+        app(ProjectImportServiceInterface::class)->import($task, $path);
+
         return Command::SUCCESS;
     }
 }

@@ -9,6 +9,11 @@ class Payment extends Model
 {
     use HasFactory;
 
-    protected $guarded = false;
+    protected $fillable = [
+        'project_id',
+        'title',
+        'value',
+    ];
+
     protected $table = 'payments';
 }

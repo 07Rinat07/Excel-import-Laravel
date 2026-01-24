@@ -49,6 +49,16 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        $user = Auth::user();
+        if ($user && $user->is_blocked) {
+            Auth::guard('web')->logout();
+            RateLimiter::clear($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'email' => trans('auth.blocked'),
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
     }
 

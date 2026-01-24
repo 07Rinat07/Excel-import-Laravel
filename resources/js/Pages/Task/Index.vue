@@ -1,90 +1,135 @@
 <template>
-    <div>
-        Task Index
+    <div class="space-y-8">
+        <Head :title="$t('labels.importTasks')" />
 
-        <div v-if="tasks" class="mt-4 -mb-3">
-            <div class="not-prose relative bg-slate-50 rounded-xl overflow-hidden dark:bg-slate-800/25">
-                <div style="background-position:10px 10px"
-                     class="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,#fff,rgba(255,255,255,0.6))] dark:bg-grid-slate-700/25 dark:[mask-image:linear-gradient(0deg,rgba(255,255,255,0.1),rgba(255,255,255,0.5))]"></div>
-                <div class="relative rounded-xl overflow-auto">
-                    <div class="shadow-sm overflow-hidden my-8">
-                        <table class="border-collapse table-auto w-full text-sm">
-                            <thead>
-                            <tr>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pl-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    ID
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pl-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    User
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    File
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pr-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Status
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pr-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Failed Rows
-                                </th>
-                            </tr>
-                            </thead>
-                            <tbody class="bg-white dark:bg-slate-800">
-                            <tr v-for="task in tasks.data">
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pl-8 text-slate-500 dark:text-slate-400">
-                                    {{ task.id }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pl-8 text-slate-500 dark:text-slate-400">
-                                    {{ task.user.name }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 text-slate-500 dark:text-slate-400">
-                                    {{ task.file.path }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pr-8 text-slate-500 dark:text-slate-400">
-                                    {{ task.status }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pr-8 text-slate-500 dark:text-slate-400">
-                                    <Link v-if="task.failed_rows_count > 0" class="text-sky-500"
-                                          :href="route('task.failed_list', task.id)">Failed Rows
-                                    </Link>
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
+        <header class="flex flex-wrap items-center justify-between gap-4">
+            <div>
+                <p class="text-sm uppercase tracking-[0.2em] text-slate-500">{{ $t('labels.importsEyebrow') }}</p>
+                <h1 class="text-2xl sm:text-3xl font-semibold text-slate-900">{{ $t('labels.importTasks') }}</h1>
+                <p class="mt-2 text-sm text-slate-600">{{ $t('task.subtitle') }}</p>
+            </div>
+            <Link class="w-full sm:w-auto rounded-full border border-slate-300 px-4 py-2 text-center text-xs font-semibold text-slate-700" :href="route('project.import')">
+                {{ $t('actions.newImport') }}
+            </Link>
+        </header>
+
+        <section class="rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-lg shadow-slate-200/40">
+            <div v-if="tasks.data.length === 0" class="text-center text-sm text-slate-600">
+                {{ $t('labels.noTasks') }}
+            </div>
+            <div v-else class="space-y-6">
+                <div class="space-y-4 sm:hidden">
+                    <div v-for="task in tasks.data" :key="task.id" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">ID</p>
+                                <p class="text-lg font-semibold text-slate-900">#{{ task.id }}</p>
+                            </div>
+                            <span class="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
+                                {{ task.status }}
+                            </span>
+                        </div>
+
+                        <div class="mt-3 grid gap-2 text-sm">
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">{{ $t('labels.file') }}</span>
+                                <span class="text-slate-700 text-right">{{ task.file.title }}</span>
+                            </div>
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">{{ $t('labels.type') }}</span>
+                                <span class="text-slate-700 text-right">{{ task.type?.title || '—' }}</span>
+                            </div>
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">{{ $t('labels.failed') }}</span>
+                                <span class="text-slate-700 text-right">{{ task.failed_rows_count }}</span>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            <Link class="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700" :href="route('task.export', { task: task.id, format: 'xlsx' })">
+                                XLSX
+                            </Link>
+                            <Link class="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700" :href="route('task.export', { task: task.id, format: 'csv' })">
+                                CSV
+                            </Link>
+                            <Link
+                                v-if="task.failed_rows_count > 0"
+                                class="rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600"
+                                :href="route('task.failed_list', task.id)"
+                            >
+                                {{ $t('actions.viewFailedRows') }}
+                            </Link>
+                        </div>
                     </div>
                 </div>
-                <div
-                    class="absolute inset-0 pointer-events-none border border-black/5 rounded-xl dark:border-white/5"></div>
+
+                <div class="hidden sm:block overflow-x-auto">
+                    <table class="min-w-[640px] text-xs sm:text-sm">
+                    <thead>
+                        <tr class="text-left text-slate-500">
+                            <th class="pb-3 pr-6">ID</th>
+                            <th class="pb-3 pr-6">{{ $t('labels.user') }}</th>
+                            <th class="pb-3 pr-6">{{ $t('labels.file') }}</th>
+                            <th class="pb-3 pr-6">{{ $t('labels.type') }}</th>
+                            <th class="pb-3 pr-6">{{ $t('labels.status') }}</th>
+                            <th class="pb-3 pr-6">{{ $t('labels.failed') }}</th>
+                            <th class="pb-3 text-right">{{ $t('labels.actions') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="task in tasks.data" :key="task.id" class="border-t border-slate-200">
+                            <td class="py-4 pr-6 font-semibold text-slate-900">#{{ task.id }}</td>
+                            <td class="py-4 pr-6 text-slate-600">{{ task.user.name }}</td>
+                            <td class="py-4 pr-6 text-slate-600">{{ task.file.title }}</td>
+                            <td class="py-4 pr-6 text-slate-600">{{ task.type?.title || '—' }}</td>
+                            <td class="py-4 pr-6 text-slate-600">{{ task.status }}</td>
+                            <td class="py-4 pr-6 text-slate-600">
+                                <Link
+                                    v-if="task.failed_rows_count > 0"
+                                    class="rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600"
+                                    :href="route('task.failed_list', task.id)"
+                                >
+                                    {{ task.failed_rows_count }} {{ $t('labels.errors') }}
+                                </Link>
+                                <span v-else>0</span>
+                            </td>
+                            <td class="py-4 text-right">
+                                <div class="flex flex-wrap justify-end gap-2">
+                                    <Link class="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700" :href="route('task.export', { task: task.id, format: 'xlsx' })">
+                                        XLSX
+                                    </Link>
+                                    <Link class="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700" :href="route('task.export', { task: task.id, format: 'csv' })">
+                                        CSV
+                                    </Link>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
-        <div>
-            <pagination :meta="tasks.meta"></pagination>
-        </div>
+        </section>
+
+        <Pagination :meta="tasks.meta" />
     </div>
 </template>
 
 
 <script>
-import MainLayout from "@/Layouts/MainLayout.vue";
-import {Link} from "@inertiajs/vue3";
-import Pagination from "@/Components/Pagination.vue";
+import AdminLayout from '@/Layouts/AdminLayout.vue';
+import Pagination from '@/Components/Pagination.vue';
+import { Head, Link } from '@inertiajs/vue3';
 
 export default {
-    name: "Index",
-
-    layout: MainLayout,
-
+    name: 'TaskIndex',
+    layout: AdminLayout,
     components: {
+        Head,
         Link,
-        Pagination
+        Pagination,
     },
-
-    props: [
-        'tasks'
-    ]
-}
+    props: {
+        tasks: Object,
+    },
+};
 </script>
-
-
-<style scoped>
-
-</style>

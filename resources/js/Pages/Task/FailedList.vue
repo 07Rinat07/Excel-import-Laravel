@@ -1,96 +1,99 @@
 <template>
-    <div>
-        Task Index
-        <div>
-            <Link class="text-sm" :href="route('task.index')">Back</Link>
-        </div>
-        <div v-if="failedList" class="mt-4 -mb-3">
-            <div class="not-prose relative bg-slate-50 rounded-xl overflow-hidden dark:bg-slate-800/25">
-                <div style="background-position:10px 10px"
-                     class="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,#fff,rgba(255,255,255,0.6))] dark:bg-grid-slate-700/25 dark:[mask-image:linear-gradient(0deg,rgba(255,255,255,0.1),rgba(255,255,255,0.5))]"></div>
-                <div class="relative rounded-xl overflow-auto">
-                    <div class="shadow-sm overflow-hidden my-8">
-                        <table class="border-collapse table-auto w-full text-sm">
-                            <thead>
-                            <tr>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pl-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    ID
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Row
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Key
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pr-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Message
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pr-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    task_id
-                                </th>
-                                <th class="border-b dark:border-slate-600 font-medium p-4 pr-8 pt-0 pb-3 text-slate-400 dark:text-slate-200 text-left">
-                                    Created_at
-                                </th>
-                            </tr>
-                            </thead>
-                            <tbody class="bg-white dark:bg-slate-800">
-                            <tr v-for="failedRow in failedList.data">
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pl-8 text-slate-500 dark:text-slate-400">
-                                    {{ failedRow.id }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pl-8 text-slate-500 dark:text-slate-400">
-                                    {{ failedRow.row }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pl-8 text-slate-500 dark:text-slate-400">
-                                    {{ failedRow.key }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 text-slate-500 dark:text-slate-400">
-                                    {{ failedRow.message }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pr-8 text-slate-500 dark:text-slate-400">
-                                    {{ failedRow.task_id }}
-                                </td>
-                                <td class="border-b border-slate-100 dark:border-slate-700 p-4 pr-8 text-slate-500 dark:text-slate-400">
-                                    {{ failedRow.created_at }}
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
+    <div class="space-y-8">
+        <Head :title="$t('labels.failedRows')" />
+
+        <header class="flex flex-wrap items-center justify-between gap-4">
+            <div>
+                <p class="text-sm uppercase tracking-[0.2em] text-slate-500">{{ $t('labels.validation') }}</p>
+                <h1 class="text-2xl sm:text-3xl font-semibold text-slate-900">{{ $t('task.failedRowsTitle') }}</h1>
+                <p class="mt-2 text-sm text-slate-600">{{ $t('task.failedRowsSubtitle') }}</p>
+            </div>
+            <Link class="w-full sm:w-auto rounded-full border border-slate-300 px-4 py-2 text-center text-xs font-semibold text-slate-700" :href="route('task.index')">
+                {{ $t('actions.backToTasks') }}
+            </Link>
+        </header>
+
+        <section class="rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-lg shadow-slate-200/40">
+            <div v-if="failedList.data.length === 0" class="text-center text-sm text-slate-600">
+                {{ $t('task.failedRowsNoErrors') }}
+            </div>
+            <div v-else class="space-y-6">
+                <div class="space-y-4 sm:hidden">
+                    <div v-for="row in failedList.data" :key="row.id" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">ID</p>
+                                <p class="text-lg font-semibold text-slate-900">#{{ row.id }}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">{{ $t('labels.row') }}</p>
+                                <p class="text-sm text-slate-600">{{ row.row }}</p>
+                            </div>
+                        </div>
+                        <div class="mt-3 grid gap-2 text-sm">
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">{{ $t('task.failedColumn') }}</span>
+                                <span class="text-slate-700 text-right">{{ row.key }}</span>
+                            </div>
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">{{ $t('labels.message') }}</span>
+                                <span class="text-slate-700 text-right">{{ row.message }}</span>
+                            </div>
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">{{ $t('labels.created') }}</span>
+                                <span class="text-slate-700 text-right">{{ row.created_at }}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="absolute inset-0 pointer-events-none border border-black/5 rounded-xl dark:border-white/5">
+
+                <div class="hidden sm:block overflow-x-auto">
+                    <table class="min-w-[640px] text-xs sm:text-sm">
+                    <thead>
+                        <tr class="text-left text-slate-500">
+                            <th class="pb-3 pr-6">ID</th>
+                            <th class="pb-3 pr-6">{{ $t('labels.row') }}</th>
+                            <th class="pb-3 pr-6">{{ $t('task.failedColumn') }}</th>
+                            <th class="pb-3 pr-6">{{ $t('labels.message') }}</th>
+                            <th class="pb-3 pr-6">{{ $t('labels.task') }}</th>
+                            <th class="pb-3">{{ $t('labels.created') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="failedRow in failedList.data" :key="failedRow.id" class="border-t border-slate-200">
+                            <td class="py-4 pr-6 font-semibold text-slate-900">#{{ failedRow.id }}</td>
+                            <td class="py-4 pr-6 text-slate-600">{{ failedRow.row }}</td>
+                            <td class="py-4 pr-6 text-slate-600">{{ failedRow.key }}</td>
+                            <td class="py-4 pr-6 text-slate-600">{{ failedRow.message }}</td>
+                            <td class="py-4 pr-6 text-slate-600">{{ failedRow.task_id }}</td>
+                            <td class="py-4 text-slate-600">{{ failedRow.created_at }}</td>
+                        </tr>
+                    </tbody>
+                    </table>
                 </div>
             </div>
-        </div>
-        <div>
-            <pagination :meta="failedList.meta"></pagination>
-        </div>
+        </section>
+
+        <Pagination :meta="failedList.meta" />
     </div>
 </template>
 
 
 <script>
-import MainLayout from "@/Layouts/MainLayout.vue";
-import {Link} from "@inertiajs/vue3";
-import Pagination from "@/Components/Pagination.vue";
+import AdminLayout from '@/Layouts/AdminLayout.vue';
+import Pagination from '@/Components/Pagination.vue';
+import { Head, Link } from '@inertiajs/vue3';
 
 export default {
-    name: "Index",
-
-    layout: MainLayout,
-
+    name: 'FailedList',
+    layout: AdminLayout,
     components: {
+        Head,
         Link,
-        Pagination
+        Pagination,
     },
-
-    props: [
-        'failedList'
-    ]
-}
+    props: {
+        failedList: Object,
+    },
+};
 </script>
-
-
-<style scoped>
-
-</style>

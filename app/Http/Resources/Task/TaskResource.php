@@ -21,8 +21,19 @@ class TaskResource extends JsonResource
             'id' => $this->id,
             'user' => new UserResource($this->user),
             'file' => new FileResource($this->file),
-            'status' => Task::getStatuses()[$this->status],
+            'status' => Task::getStatuses()[$this->status] ?? 'Unknown status',
+            'status_code' => $this->status,
             'failed_rows_count' => $this->failed_rows_count,
+            'type_id' => $this->type_id,
+            'template_id' => $this->template_id,
+            'type' => $this->typeModel ? [
+                'id' => $this->typeModel->id,
+                'title' => $this->typeModel->title,
+            ] : null,
+            'template' => $this->template ? [
+                'id' => $this->template->id,
+                'name' => $this->template->name,
+            ] : null,
 
         ];
     }

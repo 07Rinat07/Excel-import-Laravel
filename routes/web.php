@@ -1,6 +1,14 @@
 <?php
 
-use Illuminate\Foundation\Application;
+use App\Http\Controllers\Admin\FeedbackController as AdminFeedbackController;
+use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FeedbackController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectExportController;
+use App\Http\Controllers\TaskController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -16,31 +24,56 @@ use Inertia\Inertia;
 */
 
 Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
-});
+    return Inertia::render('Home');
+})->name('home');
 
-Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::post('/locale/{locale}', function (Request $request, string $locale) {
+    if (! in_array($locale, ['en', 'ru'], true)) {
+        abort(404);
+    }
 
-Route::middleware('auth')->group(function () {
+    $request->session()->put('locale', $locale);
+
+    return redirect()->back();
+})->name('locale.set');
+
+Route::get('/feedback', [FeedbackController::class, 'create'])->name('feedback.create');
+Route::post('/feedback', [FeedbackController::class, 'store'])
+    ->middleware('throttle:10,1')
+    ->name('feedback.store');
+
+Route::get('/dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'not_blocked'])->name('dashboard');
+
+Route::middleware(['auth', 'not_blocked'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::get('/projects', [ProjectController::class, 'index'])->name('project.index');
+    Route::get('/projects/import', [ProjectController::class, 'import'])->name('project.import');
+    Route::post('/projects/import', [ProjectController::class, 'importStore'])->name('project.import.store');
+    Route::get('/projects/{project}/export/{format}', [ProjectExportController::class, 'project'])->name('project.export');
+    Route::get('/tasks', [TaskController::class, 'index'])->name('task.index');
+    Route::get('/tasks/{task}/failed_list', [TaskController::class, 'failedList'])->name('task.failed_list');
+    Route::get('/tasks/{task}/export/{format}', [ProjectExportController::class, 'task'])->name('task.export');
+    Route::get('/types/{type}/export/{format}', [ProjectExportController::class, 'type'])->name('type.export');
 });
 
-Route::group(['[ middleware' => 'auth'], function () {
-    Route::get('/projects', [\App\Http\Controllers\ProjectController::class, 'index'])->name('project.index');
-    Route::get('/projects/import', [\App\Http\Controllers\ProjectController::class, 'import'])->name('project.import');
-    Route::post('/projects/import', [\App\Http\Controllers\ProjectController::class, 'importStore'])->name('project.import.store');
-    Route::get('/tasks', [\App\Http\Controllers\TaskController::class, 'index'])->name('task.index');
-    Route::get('/tasks/${task}/failed_list', [\App\Http\Controllers\TaskController::class, 'failedList'])->name('task.failed_list');
-
+Route::middleware(['auth', 'not_blocked', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/exports', [\App\Http\Controllers\Admin\ExportController::class, 'index'])->name('exports.index');
+    Route::get('/feedback', [AdminFeedbackController::class, 'index'])->name('feedback.index');
+    Route::patch('/feedback/{message}/read', [AdminFeedbackController::class, 'markRead'])->name('feedback.read');
+    Route::patch('/feedback/{message}/unread', [AdminFeedbackController::class, 'markUnread'])->name('feedback.unread');
+    Route::post('/feedback/{message}/block', [AdminFeedbackController::class, 'blockUser'])->name('feedback.block');
+    Route::delete('/feedback/{message}', [AdminFeedbackController::class, 'destroy'])->name('feedback.destroy');
+    Route::get('/users', [\App\Http\Controllers\Admin\UserController::class, 'index'])->name('users.index');
+    Route::patch('/users/{user}/block', [\App\Http\Controllers\Admin\UserController::class, 'block'])->name('users.block');
+    Route::patch('/users/{user}/unblock', [\App\Http\Controllers\Admin\UserController::class, 'unblock'])->name('users.unblock');
+    Route::patch('/users/{user}/make-admin', [\App\Http\Controllers\Admin\UserController::class, 'makeAdmin'])->name('users.make_admin');
+    Route::patch('/users/{user}/revoke-admin', [\App\Http\Controllers\Admin\UserController::class, 'revokeAdmin'])->name('users.revoke_admin');
+    Route::delete('/users/{user}', [\App\Http\Controllers\Admin\UserController::class, 'destroy'])->name('users.destroy');
+    Route::get('/templates', [AdminTemplateController::class, 'index'])->name('templates.index');
+    Route::get('/templates/{template}/edit', [AdminTemplateController::class, 'edit'])->name('templates.edit');
+    Route::put('/templates/{template}', [AdminTemplateController::class, 'update'])->name('templates.update');
 });
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';
