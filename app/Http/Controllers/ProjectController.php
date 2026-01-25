@@ -3,14 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Project\ImportStoreRequest;
+use App\Http\Requests\Project\ImportMapStoreRequest;
 use App\Http\Requests\Project\ProjectIndexRequest;
 use App\Http\Resources\Project\ProjectResource;
 use App\Jobs\ImportProjectExcelFileJob;
 use App\Models\ExcelTemplate;
+use App\Models\ExcelTemplateColumn;
 use App\Models\File;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\Type;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
 
 class ProjectController extends Controller
 {
@@ -150,11 +156,151 @@ class ProjectController extends Controller
             'user_id' => auth()->id(),
             'type' => 1,
             'type_id' => $data['type_id'],
-            'status' => Task::STATUS_PROCESS,
+            'status' => Task::STATUS_PENDING,
         ]);
 
-        ImportProjectExcelFileJob::dispatch($file->path, $task)->onQueue('imports');
+        return redirect()->route('project.import.map', $task);
+    }
 
-        return redirect()->back()->with(['message' => 'Excel import in process']);
+    public function importMap(Task $task)
+    {
+        $this->authorize('view', $task);
+
+        $headers = $this->extractHeaders($task->file);
+        $dataTypes = ['string', 'number', 'integer', 'date', 'boolean'];
+
+        return inertia('Project/ImportMap', [
+            'task' => [
+                'id' => $task->id,
+                'file' => $task->file ? [
+                    'id' => $task->file->id,
+                    'title' => $task->file->title,
+                ] : null,
+            ],
+            'type' => Type::query()->find($task->type_id, ['id', 'title']),
+            'headers' => $headers,
+            'data_types' => $dataTypes,
+        ]);
+    }
+
+    public function importMapStore(ImportMapStoreRequest $request, Task $task)
+    {
+        $this->authorize('view', $task);
+
+        $data = $request->validated();
+        $columns = $data['columns'] ?? [];
+        $columns = array_values(array_filter($columns, fn ($column) => ($column['include'] ?? false)));
+
+        if (! $columns) {
+            return redirect()->back()->withErrors(['mapping' => 'Выберите хотя бы одну колонку для импорта.']);
+        }
+
+        $fileTitle = $task->file?->title ?? 'file';
+        $userName = $request->user()->name ?? 'user';
+        $newTemplate = ExcelTemplate::create([
+            'type_id' => $task->type_id,
+            'name' => 'Mapped template '.$fileTitle.' - '.$userName.' - '.now()->format('Y-m-d H:i'),
+            'header_hash' => sha1(implode('|', array_map(fn ($column) => (string) $column['name'], $columns))),
+            'is_active' => true,
+            'created_by' => $request->user()->id,
+        ]);
+
+        $position = 0;
+        $columnMap = [];
+        $usedKeys = [];
+
+        foreach ($columns as $column) {
+            $label = trim((string) ($column['name'] ?? ''));
+            if ($label === '') {
+                continue;
+            }
+
+            $key = Str::slug($label, '_');
+            if ($key === '') {
+                $key = 'column_'.$position;
+            }
+            $key = $this->dedupeKey($key, $usedKeys);
+            $usedKeys[] = $key;
+
+            $newColumn = ExcelTemplateColumn::create([
+                'template_id' => $newTemplate->id,
+                'key' => $key,
+                'label' => $label,
+                'data_type' => (string) ($column['data_type'] ?? 'string'),
+                'is_required' => (bool) ($column['required'] ?? false),
+                'position' => $position++,
+            ]);
+
+            $columnMap[(string) $column['index']] = $newColumn->id;
+        }
+
+        if (! $columnMap) {
+            return redirect()->back()->withErrors(['mapping' => 'Все выбранные колонки пустые. Укажите названия.']);
+        }
+
+        $task->update([
+            'template_id' => $newTemplate->id,
+            'column_map' => $columnMap,
+            'status' => Task::STATUS_PROCESS,
+            'total_rows' => 0,
+            'imported_rows' => 0,
+        ]);
+
+        ImportProjectExcelFileJob::dispatch($task->file?->path ?? '', $task)->onQueue('imports');
+
+        return redirect()->route('task.index')->with(['message' => 'Excel import in process']);
+    }
+
+    private function extractHeaders(?File $file): array
+    {
+        if (! $file) {
+            return [];
+        }
+
+        $path = Storage::disk('public')->path($file->path);
+        $reader = IOFactory::createReaderForFile($path);
+        $reader->setReadDataOnly(true);
+        $reader->setReadFilter(new class implements IReadFilter {
+            public function readCell($column, $row, $worksheetName = ''): bool
+            {
+                return (int) $row === 1;
+            }
+        });
+        $spreadsheet = $reader->load($path);
+        $sheet = $spreadsheet->getActiveSheet();
+        $highestColumn = $sheet->getHighestColumn();
+        $row = $sheet->rangeToArray("A1:{$highestColumn}1", null, true, false)[0] ?? [];
+        $spreadsheet->disconnectWorksheets();
+        unset($spreadsheet);
+
+        $headers = [];
+        foreach ($row as $index => $label) {
+            $label = trim((string) $label);
+            if ($label === '') {
+                $label = 'Column '.($index + 1);
+            }
+            $headers[] = [
+                'index' => $index,
+                'label' => $label,
+            ];
+        }
+
+        return $headers;
+    }
+
+    private function dedupeKey(string $key, array $usedKeys): string
+    {
+        if (! in_array($key, $usedKeys, true)) {
+            return $key;
+        }
+
+        $suffix = 2;
+        $candidate = $key.'_'.$suffix;
+        while (in_array($candidate, $usedKeys, true)) {
+            $suffix++;
+            $candidate = $key.'_'.$suffix;
+        }
+
+        return $candidate;
     }
 }

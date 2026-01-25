@@ -22,14 +22,18 @@ if ! grep -q "^APP_KEY=" .env || [ -z "$(grep '^APP_KEY=' .env | cut -d= -f2)" ]
   php artisan key:generate --force
 fi
 
-# Run migrations and seeders
-# Use --no-interaction to avoid prompts
-# We use || true to prevent entrypoint from failing if migrations are already running or table exists
-php artisan migrate --force --no-interaction || echo "Migration failed or already handled"
-php artisan db:seed --force
-# Optional: Seed demo data if explicitly requested via env
-if [ "${SEED_DEMO:-false}" = "true" ]; then
-  php artisan db:seed --class=DemoDataSeeder --force
+# Run migrations and seeders (optionally disabled for non-app containers)
+if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
+  # Use --no-interaction to avoid prompts
+  # Use || true to avoid failing when another container is migrating in parallel
+  php artisan migrate --force --no-interaction || echo "Migration failed or already handled"
+fi
+if [ "${RUN_SEEDERS:-true}" = "true" ]; then
+  php artisan db:seed --force
+  # Optional: Seed demo data if explicitly requested via env
+  if [ "${SEED_DEMO:-false}" = "true" ]; then
+    php artisan db:seed --class=DemoDataSeeder --force
+  fi
 fi
 
 mkdir -p storage bootstrap/cache

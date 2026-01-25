@@ -10,19 +10,17 @@ use App\Models\Task;
 use App\Services\Import\ImportFailureRecorder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use Maatwebsite\Excel\Concerns\RegistersEventListeners;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithStartRow;
 use Maatwebsite\Excel\Events\BeforeSheet;
 use Maatwebsite\Excel\Concerns\WithBatchInserts;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
+use Maatwebsite\Excel\Events\AfterImport;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 
 class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, WithBatchInserts, WithChunkReading
 {
-    use RegistersEventListeners;
-
     private Task $task;
 
     private ImportFailureRecorder $failureRecorder;
@@ -35,6 +33,16 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
 
     private static array $headings = [];
 
+    private static string $currentSheetName = 'Sheet1';
+
+    private static int $currentSheetIndex = 0;
+
+    private int $totalRows = 0;
+
+    private int $importedRows = 0;
+
+    private int $failedRows = 0;
+
     public function __construct(Task $task, ImportFailureRecorder $failureRecorder)
     {
         $this->task = $task;
@@ -43,7 +51,8 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
 
     public function collection(Collection $collection): void
     {
-        if (! self::$headings) {
+        $hasMapping = is_array($this->task->column_map) && $this->task->template_id;
+        if (! self::$headings && ! $hasMapping) {
             return;
         }
 
@@ -67,6 +76,11 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
         foreach ($collection as $rowIndex => $row) {
             $rowNumber = $rowIndex + $this->startRow();
             $values = $this->mapRowValues($row);
+            if ($this->isRowEmpty($values)) {
+                continue;
+            }
+
+            $this->totalRows++;
             $valuesByKey = $this->mapRowValuesByKey($values);
 
             $rowFailures = $this->validateRow($values);
@@ -79,6 +93,7 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
                     ];
                 }
 
+                $this->failedRows++;
                 continue;
             }
 
@@ -90,6 +105,8 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
                 'task_id' => $this->task->id,
                 'template_id' => $template->id,
                 'row_index' => $rowNumber,
+                'sheet_name' => self::$currentSheetName,
+                'sheet_index' => self::$currentSheetIndex,
                 'title' => $this->buildTitle($values, $rowNumber),
                 'created_at_time' => $createdDate,
                 'contracted_at' => $contractedDate,
@@ -111,6 +128,8 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
             if ($valueRows) {
                 ProjectValue::insert($valueRows);
             }
+
+            $this->importedRows++;
         }
 
         if ($failures) {
@@ -133,15 +152,61 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
         return 1000;
     }
 
+    public function registerEvents(): array
+    {
+        return [
+            BeforeSheet::class => [self::class, 'beforeSheet'],
+            AfterImport::class => function (): void {
+                $this->finalizeImport();
+            },
+        ];
+    }
+
     public static function beforeSheet(BeforeSheet $event): void
     {
-        self::$headings = $event->getSheet()->getDelegate()->toArray()[0] ?? [];
+        $worksheet = $event->getSheet()->getDelegate();
+        $highestColumn = $worksheet->getHighestColumn();
+        $headerRow = $worksheet->rangeToArray("A1:{$highestColumn}1", null, true, false)[0] ?? [];
+        self::$headings = $headerRow;
+        self::$currentSheetName = $worksheet->getTitle() ?: 'Sheet1';
+        $parent = $worksheet->getParent();
+        if ($parent) {
+            self::$currentSheetIndex = (int) $parent->getIndex($worksheet);
+        } else {
+            self::$currentSheetIndex = 0;
+        }
     }
 
     private function resolveTemplate(): ExcelTemplate
     {
         if ($this->template) {
             return $this->template;
+        }
+
+        if (is_array($this->task->column_map) && $this->task->template_id) {
+            $template = ExcelTemplate::with('columns')->findOrFail($this->task->template_id);
+            $columnsById = $template->columns->keyBy('id');
+
+            $mappedIds = [];
+            foreach ($this->task->column_map as $index => $columnId) {
+                $columnId = (int) $columnId;
+                $column = $columnsById->get($columnId);
+                if (! $column) {
+                    continue;
+                }
+                $this->columnMap[(int) $index] = $column;
+                $mappedIds[] = $columnId;
+            }
+
+            $this->missingRequired = $template->columns()
+                ->where('is_required', true)
+                ->whereNotIn('id', $mappedIds)
+                ->pluck('label')
+                ->all();
+
+            $this->template = $template;
+
+            return $template;
         }
 
         $headers = $this->normalizeHeadings();
@@ -371,5 +436,33 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
         }
 
         return 'Row '.$rowNumber;
+    }
+
+    private function isRowEmpty(array $values): bool
+    {
+        foreach ($values as $value) {
+            if ($value === null) {
+                continue;
+            }
+            if (is_string($value) && trim($value) === '') {
+                continue;
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+    private function finalizeImport(): void
+    {
+        $this->task->refresh();
+        $this->task->update([
+            'total_rows' => $this->totalRows,
+            'imported_rows' => $this->importedRows,
+        ]);
+
+        if ($this->missingRequired || $this->failedRows > 0) {
+            $this->task->update(['status' => Task::STATUS_ERROR]);
+        }
     }
 }

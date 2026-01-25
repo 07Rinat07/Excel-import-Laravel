@@ -51,6 +51,8 @@ Route::middleware(['auth', 'not_blocked'])->group(function () {
     Route::get('/projects', [ProjectController::class, 'index'])->name('project.index');
     Route::get('/projects/import', [ProjectController::class, 'import'])->name('project.import');
     Route::post('/projects/import', [ProjectController::class, 'importStore'])->name('project.import.store');
+    Route::get('/projects/import/{task}/map', [ProjectController::class, 'importMap'])->name('project.import.map');
+    Route::post('/projects/import/{task}/map', [ProjectController::class, 'importMapStore'])->name('project.import.map.store');
     Route::get('/projects/{project}/export/{format}', [ProjectExportController::class, 'project'])->name('project.export');
     Route::get('/tasks', [TaskController::class, 'index'])->name('task.index');
     Route::get('/tasks/{task}/failed_list', [TaskController::class, 'failedList'])->name('task.failed_list');
@@ -60,12 +62,25 @@ Route::middleware(['auth', 'not_blocked'])->group(function () {
 
 Route::middleware(['auth', 'not_blocked', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/exports', [\App\Http\Controllers\Admin\ExportController::class, 'index'])->name('exports.index');
+    Route::get('/exports/download', [\App\Http\Controllers\Admin\ExportController::class, 'download'])->name('exports.download');
+    Route::get('/types', [\App\Http\Controllers\Admin\TypeController::class, 'index'])->name('types.index');
+    Route::post('/types', [\App\Http\Controllers\Admin\TypeController::class, 'store'])->name('types.store');
+    Route::patch('/types/{type}', [\App\Http\Controllers\Admin\TypeController::class, 'update'])->name('types.update');
+    Route::delete('/types/{type}', [\App\Http\Controllers\Admin\TypeController::class, 'destroy'])->name('types.destroy');
+    Route::get('/data', [\App\Http\Controllers\Admin\DataController::class, 'index'])->name('data.index');
+    Route::post('/data/rows', [\App\Http\Controllers\Admin\DataController::class, 'store'])->name('data.store');
+    Route::patch('/data/rows', [\App\Http\Controllers\Admin\DataController::class, 'update'])->name('data.update');
+    Route::delete('/data/rows', [\App\Http\Controllers\Admin\DataController::class, 'destroy'])->name('data.destroy');
+    Route::get('/data/export', [\App\Http\Controllers\Admin\DataController::class, 'export'])->name('data.export');
+    Route::get('/data/backup', [\App\Http\Controllers\Admin\DataController::class, 'backup'])->name('data.backup');
+    Route::post('/data/cleanup', [\App\Http\Controllers\Admin\DataController::class, 'cleanup'])->name('data.cleanup');
     Route::get('/feedback', [AdminFeedbackController::class, 'index'])->name('feedback.index');
     Route::patch('/feedback/{message}/read', [AdminFeedbackController::class, 'markRead'])->name('feedback.read');
     Route::patch('/feedback/{message}/unread', [AdminFeedbackController::class, 'markUnread'])->name('feedback.unread');
     Route::post('/feedback/{message}/block', [AdminFeedbackController::class, 'blockUser'])->name('feedback.block');
     Route::delete('/feedback/{message}', [AdminFeedbackController::class, 'destroy'])->name('feedback.destroy');
     Route::get('/users', [\App\Http\Controllers\Admin\UserController::class, 'index'])->name('users.index');
+    Route::post('/users', [\App\Http\Controllers\Admin\UserController::class, 'store'])->name('users.store');
     Route::patch('/users/{user}/block', [\App\Http\Controllers\Admin\UserController::class, 'block'])->name('users.block');
     Route::patch('/users/{user}/unblock', [\App\Http\Controllers\Admin\UserController::class, 'unblock'])->name('users.unblock');
     Route::patch('/users/{user}/make-admin', [\App\Http\Controllers\Admin\UserController::class, 'makeAdmin'])->name('users.make_admin');
@@ -74,6 +89,7 @@ Route::middleware(['auth', 'not_blocked', 'admin'])->prefix('admin')->name('admi
     Route::get('/templates', [AdminTemplateController::class, 'index'])->name('templates.index');
     Route::get('/templates/{template}/edit', [AdminTemplateController::class, 'edit'])->name('templates.edit');
     Route::put('/templates/{template}', [AdminTemplateController::class, 'update'])->name('templates.update');
+    Route::post('/templates/{template}/import-columns', [AdminTemplateController::class, 'importColumns'])->name('templates.import_columns');
 });
 
 require __DIR__.'/auth.php';

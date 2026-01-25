@@ -43,6 +43,20 @@
                 </Link>
                 <Link
                     v-if="$page.props.auth.user && $page.props.auth.user.is_admin"
+                    :class="navLinkClass(['Admin/Types/Index'])"
+                    :href="route('admin.types.index')"
+                >
+                    {{ $t('nav.types') }}
+                </Link>
+                <Link
+                    v-if="$page.props.auth.user && $page.props.auth.user.is_admin"
+                    :class="navLinkClass(['Admin/Data/Index'])"
+                    :href="route('admin.data.index')"
+                >
+                    {{ $t('nav.data') }}
+                </Link>
+                <Link
+                    v-if="$page.props.auth.user && $page.props.auth.user.is_admin"
                     :class="navLinkClass(['Admin/Exports/Index'])"
                     :href="route('admin.exports.index')"
                 >

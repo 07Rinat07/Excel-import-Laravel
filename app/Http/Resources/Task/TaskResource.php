@@ -24,6 +24,8 @@ class TaskResource extends JsonResource
             'status' => Task::getStatuses()[$this->status] ?? 'Unknown status',
             'status_code' => $this->status,
             'failed_rows_count' => $this->failed_rows_count,
+            'total_rows' => $this->total_rows,
+            'imported_rows' => $this->imported_rows,
             'type_id' => $this->type_id,
             'template_id' => $this->template_id,
             'type' => $this->typeModel ? [

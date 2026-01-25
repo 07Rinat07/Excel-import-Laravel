@@ -28,6 +28,8 @@ class Project extends Model
         'task_id',
         'template_id',
         'row_index',
+        'sheet_name',
+        'sheet_index',
     ];
 
     protected $table = 'projects';
@@ -48,6 +50,7 @@ class Project extends Model
         'payment_third_step' => 'integer',
         'payment_forth_step' => 'integer',
         'effective_value' => 'decimal:2',
+        'sheet_index' => 'integer',
     ];
 
     public function scopeVisibleTo(Builder $query, User $user): Builder

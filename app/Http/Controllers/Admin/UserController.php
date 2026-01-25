@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -42,6 +44,31 @@ class UserController extends Controller
                 'q' => $search,
             ],
         ]);
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => ['nullable', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'password' => ['required', 'string', 'min:8'],
+            'is_admin' => ['nullable', 'boolean'],
+        ]);
+
+        $name = trim((string) ($data['name'] ?? ''));
+        if ($name === '') {
+            $name = Str::of($data['email'])->before('@')->toString();
+        }
+
+        User::create([
+            'name' => $name,
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+            'is_admin' => (bool) ($data['is_admin'] ?? false),
+            'is_blocked' => false,
+        ]);
+
+        return redirect()->back()->with('message', 'User created.');
     }
 
     public function block(Request $request, User $user): RedirectResponse

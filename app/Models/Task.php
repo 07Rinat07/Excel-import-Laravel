@@ -14,13 +14,21 @@ class Task extends Model
         'type',
         'type_id',
         'template_id',
+        'column_map',
+        'total_rows',
+        'imported_rows',
     ];
 
     protected $table = 'tasks';
 
     protected $casts = [
         'status' => 'integer',
+        'column_map' => 'array',
+        'total_rows' => 'integer',
+        'imported_rows' => 'integer',
     ];
+
+    const STATUS_PENDING = 0;
 
     const STATUS_PROCESS = 1;
 
@@ -31,6 +39,7 @@ class Task extends Model
     public static function getStatuses()
     {
         return [
+            self::STATUS_PENDING => 'Ожидает сопоставления колонок',
             self::STATUS_PROCESS => 'Импорт в процессе обработки',
             self::STATUS_SUCCESS => 'Импорт данных успешно прошел',
             self::STATUS_ERROR => 'Ошибка валидации во время импорта',

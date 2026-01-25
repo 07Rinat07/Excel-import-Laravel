@@ -32,8 +32,17 @@
                             </Link>
                         </div>
                     </div>
-                    <div class="hidden sm:block">
+                    <div class="hidden sm:flex items-center gap-3">
                         <LanguageSwitcher />
+                        <Link
+                            v-if="$page.props.auth.user"
+                            :href="route('logout')"
+                            method="post"
+                            as="button"
+                            class="rounded-md border border-gray-600 px-3 py-2 text-xs font-semibold text-gray-200 hover:bg-gray-700 hover:text-white"
+                        >
+                            {{ $t('nav.logout') }}
+                        </Link>
                     </div>
                 </div>
             </div>
@@ -68,6 +77,15 @@
                         class="block rounded-md px-3 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-white"
                     >
                         {{ $t('nav.feedback') }}
+                    </Link>
+                    <Link
+                        v-if="$page.props.auth.user"
+                        :href="route('logout')"
+                        method="post"
+                        as="button"
+                        class="block w-full rounded-md px-3 py-2 text-left text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-white"
+                    >
+                        {{ $t('nav.logout') }}
                     </Link>
                 </div>
             </div>

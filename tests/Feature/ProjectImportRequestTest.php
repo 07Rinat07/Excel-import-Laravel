@@ -16,7 +16,7 @@ class ProjectImportRequestTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_import_request_dispatches_job_and_creates_task(): void
+    public function test_import_request_redirects_to_mapping_and_creates_task(): void
     {
         Bus::fake();
         Storage::fake('public');
@@ -34,8 +34,8 @@ class ProjectImportRequestTest extends TestCase
             'type_id' => $type->id,
         ]);
 
-        $response->assertRedirect();
-        $response->assertSessionHas('message');
+        $task = Task::first();
+        $response->assertRedirect(route('project.import.map', $task));
 
         $this->assertDatabaseHas('files', [
             'title' => 'projects.xlsx',
@@ -44,10 +44,10 @@ class ProjectImportRequestTest extends TestCase
             'user_id' => $user->id,
             'type' => 1,
             'type_id' => $type->id,
-            'status' => Task::STATUS_PROCESS,
+            'status' => Task::STATUS_PENDING,
         ]);
 
-        Bus::assertDispatched(ImportProjectExcelFileJob::class);
+        Bus::assertNotDispatched(ImportProjectExcelFileJob::class);
     }
 
     public function test_import_request_rejects_invalid_file_type(): void
@@ -103,8 +103,9 @@ class ProjectImportRequestTest extends TestCase
             'type_id' => $type->id,
         ]);
 
-        $response->assertRedirect();
-        Bus::assertDispatched(ImportProjectExcelFileJob::class);
+        $task = Task::first();
+        $response->assertRedirect(route('project.import.map', $task));
+        Bus::assertNotDispatched(ImportProjectExcelFileJob::class);
     }
 
     public function test_import_request_accepts_tsv(): void
@@ -121,7 +122,8 @@ class ProjectImportRequestTest extends TestCase
             'type_id' => $type->id,
         ]);
 
-        $response->assertRedirect();
-        Bus::assertDispatched(ImportProjectExcelFileJob::class);
+        $task = Task::first();
+        $response->assertRedirect(route('project.import.map', $task));
+        Bus::assertNotDispatched(ImportProjectExcelFileJob::class);
     }
 }

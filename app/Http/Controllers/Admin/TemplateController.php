@@ -7,10 +7,12 @@ use App\Http\Requests\Admin\TemplateUpdateRequest;
 use App\Models\ExcelTemplate;
 use App\Models\ExcelTemplateColumn;
 use App\Models\Type;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class TemplateController extends Controller
 {
@@ -134,5 +136,90 @@ class TemplateController extends Controller
 
         return redirect()->route('admin.templates.edit', $template->id)
             ->with('message', 'Template updated.');
+    }
+
+    public function importColumns(\Illuminate\Http\Request $request, ExcelTemplate $template)
+    {
+        $data = $request->validate([
+            'file' => 'required|file|mimes:xlsx,csv,tsv,txt|max:10240',
+        ]);
+
+        $path = $data['file']->getRealPath();
+        $headers = $this->extractHeadersFromPath($path);
+
+        if (! $headers) {
+            return redirect()->back()->withErrors(['file' => 'Не удалось найти заголовки в первой строке.']);
+        }
+
+        DB::transaction(function () use ($template, $headers) {
+            ExcelTemplateColumn::where('template_id', $template->id)->delete();
+
+            $usedKeys = [];
+            $position = 0;
+            $keys = [];
+
+            foreach ($headers as $label) {
+                $key = Str::slug($label, '_');
+                if ($key === '') {
+                    $key = 'column_'.$position;
+                }
+                $key = $this->dedupeKey($key, $usedKeys);
+                $usedKeys[] = $key;
+                $keys[] = $key;
+
+                ExcelTemplateColumn::create([
+                    'template_id' => $template->id,
+                    'label' => $label,
+                    'key' => $key,
+                    'data_type' => 'string',
+                    'is_required' => false,
+                    'position' => $position++,
+                ]);
+            }
+
+            $template->update([
+                'header_hash' => sha1(implode('|', $keys)),
+            ]);
+        });
+
+        return redirect()->route('admin.templates.edit', $template->id)
+            ->with('message', 'Columns imported from Excel.');
+    }
+
+    private function extractHeadersFromPath(string $path): array
+    {
+        $reader = IOFactory::createReaderForFile($path);
+        $reader->setReadDataOnly(true);
+        $spreadsheet = $reader->load($path);
+        $sheet = $spreadsheet->getActiveSheet();
+        $highestColumn = $sheet->getHighestColumn();
+        $row = $sheet->rangeToArray("A1:{$highestColumn}1", null, true, false)[0] ?? [];
+
+        $headers = [];
+        foreach ($row as $index => $label) {
+            $label = trim((string) $label);
+            if ($label === '') {
+                continue;
+            }
+            $headers[] = $label;
+        }
+
+        return $headers;
+    }
+
+    private function dedupeKey(string $key, array $usedKeys): string
+    {
+        if (! in_array($key, $usedKeys, true)) {
+            return $key;
+        }
+
+        $suffix = 2;
+        $candidate = $key.'_'.$suffix;
+        while (in_array($candidate, $usedKeys, true)) {
+            $suffix++;
+            $candidate = $key.'_'.$suffix;
+        }
+
+        return $candidate;
     }
 }

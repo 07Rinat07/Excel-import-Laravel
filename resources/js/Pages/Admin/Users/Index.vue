@@ -11,6 +11,70 @@
         </header>
 
         <section class="rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-lg shadow-slate-200/40">
+            <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.2em] text-slate-400">{{ $t('admin.usersCreateTitle') }}</p>
+                        <p class="mt-1 text-sm text-slate-600">{{ $t('admin.usersCreateSubtitle') }}</p>
+                    </div>
+                    <button
+                        class="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700"
+                        type="button"
+                        @click="openCreate = !openCreate"
+                    >
+                        {{ openCreate ? $t('actions.cancel') : $t('admin.usersCreateToggle') }}
+                    </button>
+                </div>
+
+                <div v-if="openCreate" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div>
+                        <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('labels.name') }}</label>
+                        <input
+                            v-model="newUser.name"
+                            type="text"
+                            class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs"
+                            :placeholder="$t('admin.usersNamePlaceholder')"
+                        />
+                        <div v-if="$page.props.errors?.name" class="mt-1 text-xs text-rose-600">{{ $page.props.errors.name }}</div>
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('labels.email') }}</label>
+                        <input
+                            v-model="newUser.email"
+                            type="email"
+                            class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs"
+                            placeholder="name@example.com"
+                        />
+                        <div v-if="$page.props.errors?.email" class="mt-1 text-xs text-rose-600">{{ $page.props.errors.email }}</div>
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('labels.password') }}</label>
+                        <input
+                            v-model="newUser.password"
+                            type="password"
+                            class="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs"
+                            :placeholder="$t('admin.usersPasswordPlaceholder')"
+                        />
+                        <div v-if="$page.props.errors?.password" class="mt-1 text-xs text-rose-600">{{ $page.props.errors.password }}</div>
+                    </div>
+                    <div class="flex items-center gap-3 pt-6">
+                        <label class="inline-flex items-center gap-2 text-xs text-slate-700">
+                            <input v-model="newUser.is_admin" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
+                            {{ $t('admin.usersMakeAdmin') }}
+                        </label>
+                    </div>
+                </div>
+
+                <div v-if="openCreate" class="mt-4 flex flex-wrap gap-2">
+                    <button class="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white" type="button" @click="createUser">
+                        {{ $t('actions.save') }}
+                    </button>
+                    <button class="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700" type="button" @click="resetCreate">
+                        {{ $t('actions.reset') }}
+                    </button>
+                </div>
+            </div>
+
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="search-box">
                     <input
@@ -158,6 +222,13 @@ export default {
     data() {
         return {
             search: this.filters?.q ?? '',
+            openCreate: false,
+            newUser: {
+                name: '',
+                email: '',
+                password: '',
+                is_admin: false,
+            },
         };
     },
     methods: {
@@ -182,6 +253,23 @@ export default {
                 return;
             }
             this.$inertia.delete(route('admin.users.destroy', user.id), { preserveScroll: true });
+        },
+        createUser() {
+            this.$inertia.post(route('admin.users.store'), this.newUser, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    this.resetCreate();
+                    this.openCreate = false;
+                },
+            });
+        },
+        resetCreate() {
+            this.newUser = {
+                name: '',
+                email: '',
+                password: '',
+                is_admin: false,
+            };
         },
     },
 };

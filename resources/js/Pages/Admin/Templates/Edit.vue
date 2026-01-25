@@ -20,6 +20,13 @@
             </div>
         </header>
 
+        <div v-if="$page.props.flash?.message" class="rounded-2xl border border-emerald-200 bg-emerald-50 px-6 py-4 text-sm text-emerald-700">
+            {{ $page.props.flash.message }}
+        </div>
+        <div v-if="$page.props.errors?.file" class="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm text-rose-700">
+            {{ $page.props.errors.file }}
+        </div>
+
         <section class="rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-lg shadow-slate-200/40">
             <div class="grid gap-6 lg:grid-cols-3">
                 <div class="lg:col-span-2">
@@ -46,9 +53,15 @@
                     <h2 class="text-xl font-semibold text-slate-900">{{ $t('admin.templatesColumns') }}</h2>
                     <p class="text-sm text-slate-600">{{ $t('admin.templatesColumnsSubtitle') }}</p>
                 </div>
-                <button class="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700" type="button" @click="addColumn">
-                    {{ $t('admin.templatesAddColumn') }}
-                </button>
+                <div class="flex flex-wrap gap-2">
+                    <input ref="columnsFile" type="file" class="hidden" accept=".xlsx,.csv,.tsv,.txt" @change="importColumns" />
+                    <button class="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700" type="button" @click="selectColumnsFile">
+                        {{ $t('admin.templatesImportColumns') }}
+                    </button>
+                    <button class="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700" type="button" @click="addColumn">
+                        {{ $t('admin.templatesAddColumn') }}
+                    </button>
+                </div>
             </div>
 
             <div class="mt-5 space-y-3">
@@ -122,6 +135,23 @@ export default {
         };
     },
     methods: {
+        selectColumnsFile() {
+            this.$refs.columnsFile.click();
+        },
+        importColumns(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', file);
+            this.$inertia.post(route('admin.templates.import_columns', this.template.id), formData, {
+                forceFormData: true,
+                onFinish: () => {
+                    this.$refs.columnsFile.value = null;
+                },
+            });
+        },
         addColumn() {
             const position = this.form.columns.length;
             this.form.columns.push({
