@@ -135,7 +135,7 @@ const messages = {
         'labels.exportTypeCsv': 'Export Type (csv)',
         'labels.importExcel': 'Import Excel',
         'labels.homeTag': 'Laravel + Excel',
-        'home.heroTitle': 'Excel imports that feel like product work, not fire drills.',
+        'home.heroTitle': 'Excel imports — order instead of chaos.',
         'home.heroBody':
             'Queue-ready uploads, structured validation, and clear task statuses for every row that matters. Built for teams shipping Laravel apps with real-world spreadsheets.',
         'home.queueFirstTitle': 'Queue-first',
@@ -518,7 +518,7 @@ const messages = {
         'labels.exportTypeCsv': 'Экспорт типа (csv)',
         'labels.importExcel': 'Импорт Excel',
         'labels.homeTag': 'Laravel + Excel',
-        'home.heroTitle': 'Импорт Excel как продуманный продукт, а не пожар.',
+        'home.heroTitle': 'Импорт Excel — порядок вместо суеты.',
         'home.heroBody':
             'Очереди, строгая валидация и понятные статусы задач для каждой строки. Подходит командам, которые делают Laravel‑проекты со сложными таблицами.',
         'home.queueFirstTitle': 'Очереди прежде всего',
