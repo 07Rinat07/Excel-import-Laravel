@@ -2,13 +2,14 @@
 
 namespace App\Services\Export;
 
-use App\Exports\ProjectValuesExport;
-use App\Exports\ProjectValuesMultiSheetExport;
+use App\Exports\ProjectValuesMultiSheetQueryExport;
+use App\Exports\ProjectValuesQueryExport;
 use App\Models\ExcelTemplate;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\Type;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -18,20 +19,20 @@ class ProjectExportService
     public function exportByProject(Project $project, string $format): BinaryFileResponse
     {
         $template = $this->resolveTemplate($project->template_id, $project->type_id);
-        $projects = collect([$project]);
+        $projectsQuery = Project::query()
+            ->whereKey($project->id);
 
-        return $this->download($projects, $template, $format, "project-{$project->id}");
+        return $this->downloadQuery($projectsQuery, $template, $format, "project-{$project->id}");
     }
 
     public function exportByTask(Task $task, string $format): BinaryFileResponse
     {
         $template = $this->resolveTemplate($task->template_id, $task->type_id);
-        $projects = Project::query()
+        $projectsQuery = Project::query()
             ->where('task_id', $task->id)
-            ->latest('id')
-            ->get();
+            ->latest('id');
 
-        return $this->download($projects, $template, $format, "task-{$task->id}");
+        return $this->downloadQuery($projectsQuery, $template, $format, "task-{$task->id}");
     }
 
     public function exportByType(Type $type, string $format, ?User $user = null): BinaryFileResponse
@@ -45,20 +46,17 @@ class ProjectExportService
             $projectsQuery = $projectsQuery->visibleTo($user);
         }
 
-        $projects = $projectsQuery->get();
-
-        return $this->download($projects, $template, $format, "type-{$type->id}");
+        return $this->downloadQuery($projectsQuery, $template, $format, "type-{$type->id}");
     }
 
     public function exportCustomByTask(Task $task, string $format, array $columnIds, array $labels = []): BinaryFileResponse
     {
         $template = $this->resolveTemplate($task->template_id, $task->type_id);
-        $projects = Project::query()
+        $projectsQuery = Project::query()
             ->where('task_id', $task->id)
-            ->latest('id')
-            ->get();
+            ->latest('id');
 
-        return $this->downloadCustom($projects, $template, $format, "task-{$task->id}-custom", $columnIds, $labels);
+        return $this->downloadCustomQuery($projectsQuery, $template, $format, "task-{$task->id}-custom", $columnIds, $labels);
     }
 
     public function exportCustomByType(Type $type, string $format, array $columnIds, array $labels = [], ?User $user = null): BinaryFileResponse
@@ -72,9 +70,7 @@ class ProjectExportService
             $projectsQuery = $projectsQuery->visibleTo($user);
         }
 
-        $projects = $projectsQuery->get();
-
-        return $this->downloadCustom($projects, $template, $format, "type-{$type->id}-custom", $columnIds, $labels);
+        return $this->downloadCustomQuery($projectsQuery, $template, $format, "type-{$type->id}-custom", $columnIds, $labels);
     }
 
     private function resolveTemplate(?int $templateId, ?int $typeId): ExcelTemplate
@@ -93,76 +89,51 @@ class ProjectExportService
             ->firstOrFail();
     }
 
-    private function download(Collection $projects, ExcelTemplate $template, string $format, string $prefix): BinaryFileResponse
+    private function downloadQuery(Builder $query, ExcelTemplate $template, string $format, string $prefix): BinaryFileResponse
     {
-        $projects = $this->normalizeProjects($projects);
         $columns = $template->columns()->orderBy('position')->get();
         $columnIds = $columns->pluck('id')->all();
 
-        $filename = $prefix.'.'.$this->normalizeFormat($format);
-        $writerType = $this->writerType($format);
-
-        if ($this->supportsMultipleSheets($format)) {
-            $sheets = $this->buildSheets($projects, $columns, $columnIds);
-            if (count($sheets) > 1) {
-                return Excel::download(new ProjectValuesMultiSheetExport($sheets), $filename, $writerType);
-            }
-        }
-
-        $projects->load(['values' => function ($query) use ($columnIds) {
-            $query->whereIn('template_column_id', $columnIds);
-        }]);
-
-        $headings = $columns->pluck('label')->all();
-        $rows = $projects->map(function (Project $project) use ($columns) {
-            $values = $project->values->keyBy('template_column_id');
-
-            return $columns->map(function ($column) use ($values) {
-                return optional($values->get($column->id))->value;
-            })->all();
-        });
-
-        return Excel::download(new ProjectValuesExport($headings, $rows), $filename, $writerType);
+        return $this->downloadQueryWithColumns($query, $columns, $columnIds, $format, $prefix);
     }
 
-    private function downloadCustom(Collection $projects, ExcelTemplate $template, string $format, string $prefix, array $columnIds, array $labels): BinaryFileResponse
+    private function downloadCustomQuery(Builder $query, ExcelTemplate $template, string $format, string $prefix, array $columnIds, array $labels): BinaryFileResponse
     {
-        $projects = $this->normalizeProjects($projects);
         $columnsById = $template->columns()->whereIn('id', $columnIds)->get()->keyBy('id');
         $orderedColumns = collect($columnIds)
             ->map(fn ($id) => $columnsById->get($id))
-            ->filter();
+            ->filter()
+            ->values();
 
-        $orderedIds = $orderedColumns->pluck('id')->all();
+        return $this->downloadQueryWithColumns($query, $orderedColumns, $orderedColumns->pluck('id')->all(), $format, $prefix, $labels);
+    }
 
+    private function downloadQueryWithColumns(Builder $query, Collection $columns, array $columnIds, string $format, string $prefix, array $labels = []): BinaryFileResponse
+    {
         $filename = $prefix.'.'.$this->normalizeFormat($format);
         $writerType = $this->writerType($format);
 
         if ($this->supportsMultipleSheets($format)) {
-            $sheets = $this->buildSheets($projects, $orderedColumns, $orderedIds, $labels);
+            $sheets = $this->buildQuerySheets($query, $columns, $columnIds, $labels);
             if (count($sheets) > 1) {
-                return Excel::download(new ProjectValuesMultiSheetExport($sheets), $filename, $writerType);
+                return Excel::download(new ProjectValuesMultiSheetQueryExport($sheets), $filename, $writerType);
             }
         }
 
-        $projects->load(['values' => function ($query) use ($orderedIds) {
-            $query->whereIn('template_column_id', $orderedIds);
+        $query = $this->applyValuesWith($query, $columnIds);
+
+        return Excel::download(
+            new ProjectValuesQueryExport($query, $columns, $labels),
+            $filename,
+            $writerType
+        );
+    }
+
+    private function applyValuesWith(Builder $query, array $columnIds): Builder
+    {
+        return $query->with(['values' => function ($valueQuery) use ($columnIds) {
+            $valueQuery->whereIn('template_column_id', $columnIds);
         }]);
-
-        $headings = $orderedColumns->map(function ($column) use ($labels) {
-            $custom = trim((string) ($labels[$column->id] ?? ''));
-            return $custom !== '' ? $custom : $column->label;
-        })->all();
-
-        $rows = $projects->map(function (Project $project) use ($orderedColumns) {
-            $values = $project->values->keyBy('template_column_id');
-
-            return $orderedColumns->map(function ($column) use ($values) {
-                return optional($values->get($column->id))->value;
-            })->all();
-        });
-
-        return Excel::download(new ProjectValuesExport($headings, $rows), $filename, $writerType);
     }
 
     private function normalizeFormat(string $format): string
@@ -181,73 +152,63 @@ class ProjectExportService
         return \Maatwebsite\Excel\Excel::XLSX;
     }
 
-    private function normalizeProjects(Collection $projects): \Illuminate\Database\Eloquent\Collection
-    {
-        if ($projects instanceof \Illuminate\Database\Eloquent\Collection) {
-            return $projects;
-        }
-
-        return new \Illuminate\Database\Eloquent\Collection($projects->all());
-    }
-
     private function supportsMultipleSheets(string $format): bool
     {
         return strtolower($format) === 'xlsx';
     }
 
-    private function buildSheets(
-        \Illuminate\Database\Eloquent\Collection $projects,
-        \Illuminate\Support\Collection $columns,
-        array $columnIds,
-        array $labels = []
-    ): array {
-        $projects->load(['values' => function ($query) use ($columnIds) {
-            $query->whereIn('template_column_id', $columnIds);
-        }]);
-
-        $grouped = $projects->groupBy(function (Project $project) {
-            return $project->sheet_name ?: 'Sheet1';
-        });
-
-        $groups = $grouped->map(function ($rows, $sheetName) {
-            $sheetIndex = $rows->min('sheet_index');
-            return [
-                'name' => (string) $sheetName,
-                'index' => is_numeric($sheetIndex) ? (int) $sheetIndex : 0,
-                'rows' => $rows,
-            ];
-        })->values();
-
-        $groups = $groups->sortBy(function (array $group) {
-            return sprintf('%05d-%s', $group['index'], $group['name']);
-        })->values();
-
-        $headings = $columns->map(function ($column) use ($labels) {
-            $custom = trim((string) ($labels[$column->id] ?? ''));
-            return $custom !== '' ? $custom : $column->label;
-        })->all();
+    private function buildQuerySheets(Builder $query, Collection $columns, array $columnIds, array $labels = []): array
+    {
+        $groups = $this->sheetGroups($query);
+        if (count($groups) <= 1) {
+            return [];
+        }
 
         $usedTitles = [];
         $sheets = [];
 
         foreach ($groups as $group) {
             $title = $this->normalizeSheetTitle($group['name'], $usedTitles);
-            $rows = $group['rows']->map(function (Project $project) use ($columns) {
-                $values = $project->values->keyBy('template_column_id');
+            $sheetQuery = clone $query;
+            if ($group['raw_name'] === null) {
+                $sheetQuery->whereNull('sheet_name');
+            } else {
+                $sheetQuery->where('sheet_name', $group['raw_name']);
+            }
+            $sheetQuery = $this->applyValuesWith($sheetQuery, $columnIds);
 
-                return $columns->map(function ($column) use ($values) {
-                    return optional($values->get($column->id))->value;
-                })->all();
-            });
-
-            $sheets[] = [
-                'title' => $title,
-                'headings' => $headings,
-                'rows' => $rows,
-            ];
+            $sheets[] = new ProjectValuesQueryExport($sheetQuery, $columns, $labels, $title);
         }
 
         return $sheets;
+    }
+
+    private function sheetGroups(Builder $query): array
+    {
+        $groupQuery = (clone $query)->reorder();
+
+        $rows = $groupQuery
+            ->selectRaw('sheet_name, MIN(sheet_index) as sheet_index')
+            ->groupBy('sheet_name')
+            ->get();
+
+        return $rows
+            ->map(function ($row) {
+                $rawName = $row->sheet_name ?? null;
+                $name = ($rawName === null || $rawName === '') ? 'Sheet1' : $rawName;
+                $index = $row->sheet_index !== null ? (int) $row->sheet_index : 0;
+
+                return [
+                    'raw_name' => $rawName,
+                    'name' => $name,
+                    'index' => $index,
+                ];
+            })
+            ->sortBy(function (array $group) {
+                return sprintf('%05d-%s', $group['index'], $group['name']);
+            })
+            ->values()
+            ->all();
     }
 
     private function normalizeSheetTitle(string $title, array &$usedTitles): string

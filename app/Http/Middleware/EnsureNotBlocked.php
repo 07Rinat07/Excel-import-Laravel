@@ -15,13 +15,18 @@ class EnsureNotBlocked
     {
         $user = $request->user();
         if ($user && $user->is_blocked) {
+            $message = trans('auth.blocked');
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json(['message' => $message], 403);
+            }
+
             Auth::guard('web')->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
             return redirect()
                 ->route('login')
-                ->withErrors(['email' => trans('auth.blocked')]);
+                ->withErrors(['email' => $message]);
         }
 
         return $next($request);

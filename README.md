@@ -30,6 +30,8 @@ Laravel-приложение для импорта файлов XLSX/CSV в ба
 3) Создайте файл окружения и сгенерируйте ключ:
 * `cp .env.example .env`
 * `php artisan key:generate`
+* (опционально) Разрешить повторный запуск импорта для завершенных задач:
+  * `IMPORT_ALLOW_RERUN_ON_SUCCESS=true`
 4) Настройте БД в `.env` и запустите миграции:
 * `php artisan migrate`
 5) Если используется публичный диск, создайте символическую ссылку на хранилище:
@@ -104,6 +106,7 @@ Laravel-приложение для импорта файлов XLSX/CSV в ба
 * Удалить контейнеры: `docker compose down`
 * Повторно заполнить демо-данными: `docker compose exec app php artisan db:seed --class=DemoDataSeeder`
 * Отключить миграции/сиды для контейнера: `RUN_MIGRATIONS=false` / `RUN_SEEDERS=false`
+* Разрешить повторный импорт успешных задач: `IMPORT_ALLOW_RERUN_ON_SUCCESS=true`
 
 ## Swagger / OpenAPI
 Генерация документации:
@@ -127,6 +130,8 @@ Laravel-приложение для импорта файлов XLSX/CSV в ба
 * `GET /api/projects/{project}/export/{format}`
 * `GET /api/tasks/{task}/export/{format}`
 * `GET /api/types/{type}/export/{format}`
+
+Важно: все API-эндпоинты требуют аутентификации и будут возвращать `403` для заблокированных пользователей (`is_blocked`).
 
 ## Обратная связь
 Публичная форма обратной связи:

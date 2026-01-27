@@ -3,11 +3,14 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class UserManagementTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_admin_can_create_user(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);

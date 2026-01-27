@@ -139,6 +139,16 @@ class TaskApiTest extends TestCase
         ]);
     }
 
+    public function test_tasks_endpoint_denies_blocked_user(): void
+    {
+        $user = User::factory()->create(['is_blocked' => true]);
+        Sanctum::actingAs($user);
+
+        $response = $this->getJson('/api/tasks');
+
+        $response->assertForbidden();
+    }
+
     public function test_failed_rows_endpoint_denies_other_user(): void
     {
         $user = User::factory()->create();

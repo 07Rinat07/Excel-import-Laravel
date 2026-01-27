@@ -34,7 +34,11 @@ class ImportProjectExcelFileJob implements ShouldQueue
     public function handle(ProjectImportServiceInterface $importService): void
     {
         $this->task->refresh();
-        $this->task->update(['status' => Task::STATUS_PROCESS]);
+        if ($this->task->status === Task::STATUS_SUCCESS && ! config('imports.allow_rerun_on_success', false)) {
+            return;
+        }
+
+        $this->prepareForImport($this->task);
 
         try {
             $importService->import($this->task, $this->path);
@@ -49,5 +53,16 @@ class ImportProjectExcelFileJob implements ShouldQueue
         if ($this->task->status === Task::STATUS_PROCESS) {
             $this->task->update(['status' => Task::STATUS_SUCCESS]);
         }
+    }
+
+    private function prepareForImport(Task $task): void
+    {
+        $task->failedRows()->delete();
+        $task->projects()->delete();
+        $task->update([
+            'status' => Task::STATUS_PROCESS,
+            'total_rows' => 0,
+            'imported_rows' => 0,
+        ]);
     }
 }

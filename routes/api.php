@@ -20,11 +20,10 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
-});
-
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'not_blocked'])->group(function () {
+    Route::get('/user', function (Request $request) {
+        return $request->user();
+    });
     Route::get('/health', HealthController::class);
     Route::get('/tasks', [TaskController::class, 'index'])->name('api.tasks.index');
     Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('api.tasks.show');

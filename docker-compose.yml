@@ -21,6 +21,7 @@ services:
       QUEUE_CONNECTION: database
       FILESYSTEM_DISK: public
       SEED_DEMO: "true"
+      IMPORT_ALLOW_RERUN_ON_SUCCESS: "true"
     volumes:
       - ./:/var/www/html:delegated
     depends_on:
@@ -45,6 +46,7 @@ services:
       FILESYSTEM_DISK: public
       RUN_MIGRATIONS: "false"
       RUN_SEEDERS: "false"
+      IMPORT_ALLOW_RERUN_ON_SUCCESS: "true"
     volumes:
       - ./:/var/www/html:delegated
     depends_on:

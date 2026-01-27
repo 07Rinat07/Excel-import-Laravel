@@ -31,6 +31,8 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
 
     private array $missingRequired = [];
 
+    private bool $missingRequiredRecorded = false;
+
     private static array $headings = [];
 
     private static string $currentSheetName = 'Sheet1';
@@ -47,6 +49,9 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
     {
         $this->task = $task;
         $this->failureRecorder = $failureRecorder;
+        self::$headings = [];
+        self::$currentSheetName = 'Sheet1';
+        self::$currentSheetIndex = 0;
     }
 
     public function collection(Collection $collection): void
@@ -58,15 +63,18 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
 
         $template = $this->resolveTemplate();
         if ($this->missingRequired) {
-            $failures = [];
-            foreach ($this->missingRequired as $label) {
-                $failures[] = [
-                    'row' => 1,
-                    'key' => $label,
-                    'message' => 'Отсутствует обязательная колонка в файле.',
-                ];
+            if (! $this->missingRequiredRecorded) {
+                $failures = [];
+                foreach ($this->missingRequired as $label) {
+                    $failures[] = [
+                        'row' => 1,
+                        'key' => $label,
+                        'message' => 'Отсутствует обязательная колонка в файле.',
+                    ];
+                }
+                $this->failureRecorder->recordCustomFailures($failures, $this->task);
+                $this->missingRequiredRecorded = true;
             }
-            $this->failureRecorder->recordCustomFailures($failures, $this->task);
 
             return;
         }
