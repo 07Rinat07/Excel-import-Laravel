@@ -13,10 +13,13 @@ use App\Models\File;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\Type;
+use App\Services\SheetProcessingService;
+use App\Services\SmartMappingService;
+use Database\Seeders\TypesSeeder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use PhpOffice\PhpSpreadsheet\IOFactory;
-use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
+use Illuminate\Validation\ValidationException;
 
 class ProjectController extends Controller
 {
@@ -135,13 +138,32 @@ class ProjectController extends Controller
             ->all();
     }
 
-    public function import()
+    public function import(Request $request)
     {
         $this->authorize('viewAny', Project::class);
 
         $types = Type::query()->orderBy('title')->get(['id', 'title']);
+        $recentTasks = Task::query()
+            ->visibleTo($request->user())
+            ->with(['file', 'typeModel'])
+            ->latest('id')
+            ->limit(3)
+            ->get()
+            ->map(function (Task $task) {
+                return [
+                    'id' => $task->id,
+                    'file_title' => $task->file?->title ?? 'File '.$task->id,
+                    'type_title' => $task->typeModel?->title ?? '',
+                    'status_key' => $this->taskStatusKey($task->status),
+                    'created_at' => $task->created_at?->format('Y-m-d H:i') ?? null,
+                    'map_url' => $task->status === Task::STATUS_PENDING ? route('project.import.map', $task) : null,
+                ];
+            })->all();
 
-        return inertia('Project/Import', compact('types'));
+        return inertia('Project/ImportWizard', [
+            'types' => $types,
+            'recentTasks' => $recentTasks,
+        ]);
     }
 
     public function importStore(ImportStoreRequest $request)
@@ -150,24 +172,217 @@ class ProjectController extends Controller
 
         $data = $request->validated();
 
+        $typeId = $this->resolveTypeId($data['type_id'] ?? null);
+        if (! $typeId) {
+            $message = 'Types are not configured. Please create a type before importing.';
+            if ($request->wantsJson()) {
+                return response()->json(['message' => $message], 422);
+            }
+
+            return redirect()->back()->withErrors(['type_id' => $message]);
+        }
+
         $file = File::putAndCreate($data['file']);
         $task = Task::create([
             'file_id' => $file->id,
             'user_id' => auth()->id(),
             'type' => 1,
-            'type_id' => $data['type_id'],
+            'type_id' => $typeId,
             'status' => Task::STATUS_PENDING,
         ]);
+
+        // Return JSON for AJAX requests, redirect for regular requests
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'task_id' => $task->id,
+                'redirect_url' => route('project.import.map', $task),
+            ]);
+        }
 
         return redirect()->route('project.import.map', $task);
     }
 
-    public function importMap(Task $task)
+    public function importPrepare(ImportStoreRequest $request)
+    {
+        $this->authorize('viewAny', Project::class);
+
+        $data = $request->validated();
+
+        $typeId = $this->resolveTypeId($data['type_id'] ?? null);
+        if (! $typeId) {
+            return response()->json([
+                'message' => 'Types are not configured. Please create a type before importing.',
+            ], 422);
+        }
+
+        $file = File::putAndCreate($data['file']);
+        $task = Task::create([
+            'file_id' => $file->id,
+            'user_id' => $request->user()->id,
+            'type' => 1,
+            'type_id' => $typeId,
+            'status' => Task::STATUS_PENDING,
+        ]);
+
+        $sheetService = app(SheetProcessingService::class);
+        $mappingService = app(SmartMappingService::class);
+        $headers = [];
+        $previewRows = [];
+        $availableSheets = [];
+        $selectedSheetIndex = null;
+
+        $path = Storage::disk('public')->path($file->path);
+        $availableSheets = $sheetService->getAvailableSheets($path);
+        if ($availableSheets) {
+            $selectedSheetIndex = $sheetService->findBestSheet($path);
+            if (! $sheetService->validateSheetIndex($path, (int) $selectedSheetIndex)) {
+                $selectedSheetIndex = 0;
+            }
+            $task->update([
+                'available_sheets' => $availableSheets,
+                'selected_sheet_index' => $selectedSheetIndex,
+                'sheet' => $availableSheets[$selectedSheetIndex]['name'] ?? null,
+            ]);
+
+            $rawHeaders = $sheetService->getSheetHeaders($path, (int) $selectedSheetIndex);
+            $headers = $this->normalizeHeaders($rawHeaders);
+            $previewRows = $sheetService->readSheetData($path, (int) $selectedSheetIndex, true, 4);
+        }
+
+        $dataTypes = ['string', 'number', 'integer', 'date', 'boolean'];
+
+        $template = ExcelTemplate::query()
+            ->where('type_id', $typeId)
+            ->where('is_active', true)
+            ->latest('id')
+            ->first();
+
+        $mappingSuggestion = null;
+        $templateColumns = [];
+        if ($template) {
+            $template->load('columns');
+            $headerLabels = array_map(
+                fn ($header) => $header['original_label'] !== '' ? $header['original_label'] : $header['label'],
+                $headers
+            );
+            $mappingSuggestion = $mappingService->suggestMapping($headerLabels, $template->columns);
+            $templateColumns = $template->columns->mapWithKeys(function (ExcelTemplateColumn $column) {
+                return [
+                    $column->id => [
+                        'id' => $column->id,
+                        'key' => $column->key,
+                        'label' => $column->label,
+                        'data_type' => $column->data_type,
+                        'is_required' => (bool) $column->is_required,
+                        'validation_rules' => $column->validation_rules ?? [],
+                    ],
+                ];
+            })->all();
+        }
+
+        return response()->json([
+            'task' => [
+                'id' => $task->id,
+            ],
+            'file' => [
+                'id' => $file->id,
+                'title' => $file->title,
+            ],
+            'headers' => $headers,
+            'preview_rows' => $previewRows,
+            'available_sheets' => $availableSheets,
+            'selected_sheet_index' => $selectedSheetIndex,
+            'data_types' => $dataTypes,
+            'mapping_suggestion' => $mappingSuggestion,
+            'template_columns' => $templateColumns,
+        ]);
+    }
+
+    private function resolveTypeId(?int $typeId): ?int
+    {
+        if ($typeId) {
+            return Type::query()->whereKey($typeId)->exists() ? $typeId : null;
+        }
+
+        if (! Type::query()->exists()) {
+            app(TypesSeeder::class)->run();
+        }
+
+        return Type::query()->value('id');
+    }
+
+    public function importMap(Request $request, Task $task)
     {
         $this->authorize('view', $task);
 
-        $headers = $this->extractHeaders($task->file);
+        $sheetService = app(SheetProcessingService::class);
+        $mappingService = app(SmartMappingService::class);
+
+        $headers = [];
+        $previewRows = [];
+        $availableSheets = [];
+        $selectedSheetIndex = $task->selected_sheet_index ?? null;
+
+        if ($task->file) {
+            $path = Storage::disk('public')->path($task->file->path);
+            $availableSheets = $sheetService->getAvailableSheets($path);
+            $requestedIndex = $request->query('sheet_index');
+            if ($requestedIndex !== null) {
+                $selectedSheetIndex = (int) $requestedIndex;
+            }
+
+            if ($selectedSheetIndex === null) {
+                $selectedSheetIndex = $sheetService->findBestSheet($path);
+            }
+
+            if (! $sheetService->validateSheetIndex($path, (int) $selectedSheetIndex)) {
+                $selectedSheetIndex = 0;
+            }
+
+            if ($availableSheets) {
+                $task->update([
+                    'available_sheets' => $availableSheets,
+                    'selected_sheet_index' => $selectedSheetIndex,
+                    'sheet' => $availableSheets[$selectedSheetIndex]['name'] ?? null,
+                ]);
+            }
+
+            $rawHeaders = $sheetService->getSheetHeaders($path, (int) $selectedSheetIndex);
+            $headers = $this->normalizeHeaders($rawHeaders);
+            $previewRows = $sheetService->readSheetData($path, (int) $selectedSheetIndex, true, 4);
+        }
+
         $dataTypes = ['string', 'number', 'integer', 'date', 'boolean'];
+
+        $template = ExcelTemplate::query()
+            ->where('type_id', $task->type_id)
+            ->where('is_active', true)
+            ->latest('id')
+            ->first();
+
+        $mappingSuggestion = null;
+        $templateColumns = [];
+        if ($template) {
+            $template->load('columns');
+            $headerLabels = array_map(
+                fn ($header) => $header['original_label'] !== '' ? $header['original_label'] : $header['label'],
+                $headers
+            );
+            $mappingSuggestion = $mappingService->suggestMapping($headerLabels, $template->columns);
+            $templateColumns = $template->columns->mapWithKeys(function (ExcelTemplateColumn $column) {
+                return [
+                    $column->id => [
+                        'id' => $column->id,
+                        'key' => $column->key,
+                        'label' => $column->label,
+                        'data_type' => $column->data_type,
+                        'is_required' => (bool) $column->is_required,
+                        'validation_rules' => $column->validation_rules ?? [],
+                    ],
+                ];
+            })->all();
+        }
 
         return inertia('Project/ImportMap', [
             'task' => [
@@ -179,7 +394,12 @@ class ProjectController extends Controller
             ],
             'type' => Type::query()->find($task->type_id, ['id', 'title']),
             'headers' => $headers,
+            'preview_rows' => $previewRows,
+            'available_sheets' => $availableSheets,
+            'selected_sheet_index' => $selectedSheetIndex,
             'data_types' => $dataTypes,
+            'mapping_suggestion' => $mappingSuggestion,
+            'template_columns' => $templateColumns,
         ]);
     }
 
@@ -187,22 +407,44 @@ class ProjectController extends Controller
     {
         $this->authorize('view', $task);
 
-        $data = $request->validated();
+        try {
+            $this->applyMapping($task, $request->validated(), $request->user());
+        } catch (ValidationException $exception) {
+            return redirect()->back()->withErrors($exception->errors());
+        }
+
+        return redirect()->route('task.index')->with(['message' => 'Excel import in process']);
+    }
+
+    public function importMapStoreJson(ImportMapStoreRequest $request, Task $task)
+    {
+        $this->authorize('view', $task);
+
+        $this->applyMapping($task, $request->validated(), $request->user());
+
+        return response()->json([
+            'success' => true,
+            'task_id' => $task->id,
+        ]);
+    }
+
+    private function applyMapping(Task $task, array $data, \App\Models\User $user): void
+    {
         $columns = $data['columns'] ?? [];
         $columns = array_values(array_filter($columns, fn ($column) => ($column['include'] ?? false)));
 
         if (! $columns) {
-            return redirect()->back()->withErrors(['mapping' => 'Выберите хотя бы одну колонку для импорта.']);
+            throw ValidationException::withMessages(['mapping' => 'Выберите хотя бы одну колонку для импорта.']);
         }
 
         $fileTitle = $task->file?->title ?? 'file';
-        $userName = $request->user()->name ?? 'user';
+        $userName = $user->name ?? 'user';
         $newTemplate = ExcelTemplate::create([
             'type_id' => $task->type_id,
             'name' => 'Mapped template '.$fileTitle.' - '.$userName.' - '.now()->format('Y-m-d H:i'),
             'header_hash' => sha1(implode('|', array_map(fn ($column) => (string) $column['name'], $columns))),
             'is_active' => true,
-            'created_by' => $request->user()->id,
+            'created_by' => $user->id,
         ]);
 
         $position = 0;
@@ -228,6 +470,7 @@ class ProjectController extends Controller
                 'label' => $label,
                 'data_type' => (string) ($column['data_type'] ?? 'string'),
                 'is_required' => (bool) ($column['required'] ?? false),
+                'validation_rules' => $this->normalizeValidationRules($column['validation_rules'] ?? null),
                 'position' => $position++,
             ]);
 
@@ -235,7 +478,7 @@ class ProjectController extends Controller
         }
 
         if (! $columnMap) {
-            return redirect()->back()->withErrors(['mapping' => 'Все выбранные колонки пустые. Укажите названия.']);
+            throw ValidationException::withMessages(['mapping' => 'Все выбранные колонки пустые. Укажите названия.']);
         }
 
         $task->update([
@@ -244,44 +487,23 @@ class ProjectController extends Controller
             'status' => Task::STATUS_PROCESS,
             'total_rows' => 0,
             'imported_rows' => 0,
+            'selected_sheet_index' => $data['sheet_index'] ?? $task->selected_sheet_index,
         ]);
 
         ImportProjectExcelFileJob::dispatch($task->file?->path ?? '', $task)->onQueue('imports');
-
-        return redirect()->route('task.index')->with(['message' => 'Excel import in process']);
     }
 
-    private function extractHeaders(?File $file): array
+    private function normalizeHeaders(array $row): array
     {
-        if (! $file) {
-            return [];
-        }
-
-        $path = Storage::disk('public')->path($file->path);
-        $reader = IOFactory::createReaderForFile($path);
-        $reader->setReadDataOnly(true);
-        $reader->setReadFilter(new class implements IReadFilter {
-            public function readCell($column, $row, $worksheetName = ''): bool
-            {
-                return (int) $row === 1;
-            }
-        });
-        $spreadsheet = $reader->load($path);
-        $sheet = $spreadsheet->getActiveSheet();
-        $highestColumn = $sheet->getHighestColumn();
-        $row = $sheet->rangeToArray("A1:{$highestColumn}1", null, true, false)[0] ?? [];
-        $spreadsheet->disconnectWorksheets();
-        unset($spreadsheet);
-
         $headers = [];
         foreach ($row as $index => $label) {
-            $label = trim((string) $label);
-            if ($label === '') {
-                $label = 'Column '.($index + 1);
-            }
+            $normalized = trim((string) $label);
+            $isUnnamed = $normalized === '';
             $headers[] = [
                 'index' => $index,
-                'label' => $label,
+                'label' => $isUnnamed ? 'Column '.($index + 1) : $normalized,
+                'original_label' => $normalized,
+                'is_unnamed' => $isUnnamed,
             ];
         }
 
@@ -302,5 +524,51 @@ class ProjectController extends Controller
         }
 
         return $candidate;
+    }
+
+    private function taskStatusKey(int $status): string
+    {
+        return match ($status) {
+            Task::STATUS_PENDING => 'pending',
+            Task::STATUS_PROCESS => 'processing',
+            Task::STATUS_SUCCESS => 'success',
+            Task::STATUS_ERROR => 'error',
+            default => 'unknown',
+        };
+    }
+
+    private function normalizeValidationRules(mixed $rules): ?array
+    {
+        if (is_array($rules)) {
+            $rules = array_values(array_filter(array_map('trim', $rules)));
+            return $rules ?: null;
+        }
+
+        if (! is_string($rules)) {
+            return null;
+        }
+
+        $rules = trim($rules);
+        if ($rules === '') {
+            return null;
+        }
+
+        if (str_starts_with($rules, '[')) {
+            $decoded = json_decode($rules, true);
+            if (is_array($decoded)) {
+                $decoded = array_values(array_filter(array_map('trim', $decoded)));
+                return $decoded ?: null;
+            }
+        }
+
+        if (str_contains($rules, "\n")) {
+            $parts = preg_split("/\r\n|\n|\r/", $rules);
+        } else {
+            $parts = explode('|', $rules);
+        }
+
+        $parts = array_values(array_filter(array_map('trim', $parts)));
+
+        return $parts ?: null;
     }
 }

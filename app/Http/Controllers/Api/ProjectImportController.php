@@ -4,76 +4,114 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Project\ImportStoreRequest;
-use App\Jobs\ImportProjectExcelFileJob;
-use App\Models\File;
-use App\Models\Project;
-use App\Models\Task;
+use App\Application\Import\UseCases\StartImportUseCase;
+use App\Application\Import\DTO\StartImportRequest as StartImportDTO;
+use App\Domain\Import\ValueObjects\FileName;
+use App\Domain\Import\ValueObjects\FileContent;
+use App\Domain\Import\ValueObjects\UserId;
+use App\Domain\Import\ValueObjects\TemplateId;
+use App\Domain\Import\ValueObjects\MappingStrategy;
+use App\Domain\Import\Exceptions\InvalidFileException;
+use App\Domain\Import\Exceptions\ValidationFailedException;
+use App\Models\Type;
+use Database\Seeders\TypesSeeder;
 use Illuminate\Http\JsonResponse;
-use OpenApi\Annotations as OA;
+use Illuminate\Http\Request;
+use Psr\Log\LoggerInterface;
 
+/**
+ * Controller: ProjectImportController
+ *
+ * Thin layer for HTTP handling.
+ * All business logic delegated to Use Cases.
+ */
 class ProjectImportController extends Controller
 {
+    public function __construct(
+        private readonly StartImportUseCase $startImportUseCase,
+        private readonly LoggerInterface $logger,
+    ) {}
+
     /**
-     * @OA\Post(
-     *     path="/api/projects/import",
-     *     tags={"Projects"},
-     *     summary="Import projects from an Excel file",
-     *     security={{"bearerAuth":{}}},
+     * Store a new import task.
      *
-     *     @OA\RequestBody(
-     *         required=true,
-     *
-     *         @OA\MediaType(
-     *             mediaType="multipart/form-data",
-     *
-     *             @OA\Schema(
-     *                 required={"file","type_id"},
-     *
-     *                 @OA\Property(
-     *                     property="file",
-     *                     type="string",
-     *                     format="binary",
-     *                     description="XLSX, CSV or TSV file"
-     *                 ),
-     *                 @OA\Property(
-     *                     property="type_id",
-     *                     type="integer",
-     *                     example=1
-     *                 )
-     *             )
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=202,
-     *         description="Import accepted"
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
-     * )
+     * @param ImportStoreRequest $request
+     * @return JsonResponse
      */
     public function store(ImportStoreRequest $request): JsonResponse
     {
-        $this->authorize('viewAny', Project::class);
+        try {
+            $user = $request->user();
+            $validatedData = $request->validated();
+            $typeId = $this->resolveTypeId($validatedData['type_id'] ?? null);
 
-        $data = $request->validated();
+            if (! $typeId) {
+                return response()->json([
+                    'error' => 'Validation failed',
+                    'message' => 'Types are not configured. Please create a type before importing.',
+                ], 422);
+            }
 
-        $file = File::putAndCreate($data['file']);
-        $task = Task::create([
-            'file_id' => $file->id,
-            'user_id' => $request->user()->id,
-            'type' => 1,
-            'type_id' => $data['type_id'],
-            'status' => Task::STATUS_PROCESS,
-        ]);
+            // Log import start
+            $this->logger->info('Import started', [
+                'user_id' => $user->id,
+                'file_name' => $validatedData['file']->getClientOriginalName(),
+            ]);
 
-        ImportProjectExcelFileJob::dispatch($file->path, $task)->onQueue('imports');
+            // Execute use case
+            $response = $this->startImportUseCase->execute(
+                new StartImportDTO(
+                    fileName: new FileName($validatedData['file']->getClientOriginalName()),
+                    fileContent: FileContent::fromFile($validatedData['file']),
+                    userId: new UserId($user->id),
+                    templateId: new TemplateId($typeId),
+                    mappingStrategy: MappingStrategy::automatic(),
+                )
+            );
 
-        return response()->json([
-            'message' => 'Excel import in process',
-            'task_id' => $task->id,
-        ], 202);
+            return response()->json([
+                'message' => 'Import task created successfully',
+                'task_id' => $response->importTaskId->value(),
+                'status' => 'pending',
+                'created_at' => now()->toIso8601String(),
+            ], 202);
+
+        } catch (InvalidFileException $e) {
+            $this->logger->warning('Invalid import file', ['error' => $e->getMessage()]);
+            return response()->json([
+                'error' => 'Invalid file format',
+                'message' => $e->getMessage(),
+            ], 422);
+
+        } catch (ValidationFailedException $e) {
+            $this->logger->warning('Import validation failed', ['error' => $e->getMessage()]);
+            return response()->json([
+                'error' => 'Validation failed',
+                'message' => $e->getMessage(),
+            ], 422);
+
+        } catch (\Throwable $e) {
+            $this->logger->error('Import error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'error' => 'Internal server error',
+                'message' => 'Failed to process import',
+            ], 500);
+        }
+    }
+
+    private function resolveTypeId(?int $typeId): ?int
+    {
+        if ($typeId) {
+            return Type::query()->whereKey($typeId)->exists() ? $typeId : null;
+        }
+
+        if (! Type::query()->exists()) {
+            app(TypesSeeder::class)->run();
+        }
+
+        return Type::query()->value('id');
     }
 }

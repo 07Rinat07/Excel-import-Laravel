@@ -65,7 +65,7 @@
             </div>
 
             <div class="mt-5 space-y-3">
-                <div v-for="(column, index) in form.columns" :key="column.local_id" class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 lg:grid-cols-[1.4fr_1fr_0.8fr_0.6fr_0.4fr]">
+                <div v-for="(column, index) in form.columns" :key="column.local_id" class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 lg:grid-cols-[1.4fr_1fr_0.8fr_1fr_0.6fr_0.4fr]">
                     <div>
                         <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('admin.templatesColumnLabel') }}</label>
                         <input v-model="column.label" class="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" type="text" />
@@ -83,6 +83,15 @@
                             <option value="date">{{ $t('dataType.date') }}</option>
                             <option value="boolean">{{ $t('dataType.boolean') }}</option>
                         </select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('admin.templatesColumnValidation') }}</label>
+                        <input
+                            v-model="column.validation_rules"
+                            class="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                            type="text"
+                            :placeholder="$t('admin.templatesColumnValidationHint')"
+                        />
                     </div>
                     <div class="flex items-center gap-2">
                         <input v-model="column.is_required" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
@@ -129,6 +138,7 @@ export default {
                 is_active: this.template.is_active,
                 columns: this.template.columns.map((column, index) => ({
                     ...column,
+                    validation_rules: Array.isArray(column.validation_rules) ? column.validation_rules.join('|') : (column.validation_rules ?? ''),
                     local_id: `${column.id}-${index}`,
                 })),
             },
@@ -159,6 +169,7 @@ export default {
                 label: '',
                 key: '',
                 data_type: 'string',
+                validation_rules: '',
                 is_required: false,
                 position,
                 local_id: `new-${Date.now()}-${position}`,

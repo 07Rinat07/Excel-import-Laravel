@@ -19,13 +19,19 @@ class ImportProjectExcelFileJob implements ShouldQueue
 
     private Task $task;
 
+    private array $correctedRows;
+
+    private bool $isReimport;
+
     /**
      * Create a new job instance.
      */
-    public function __construct(string $path, Task $task)
+    public function __construct(string $path, Task $task, array $correctedRows = [], bool $isReimport = false)
     {
         $this->path = $path;
         $this->task = $task;
+        $this->correctedRows = $correctedRows;
+        $this->isReimport = $isReimport;
     }
 
     /**
@@ -41,7 +47,11 @@ class ImportProjectExcelFileJob implements ShouldQueue
         $this->prepareForImport($this->task);
 
         try {
-            $importService->import($this->task, $this->path);
+            if ($this->isReimport) {
+                $importService->reimportCorrectedRows($this->task, $this->correctedRows);
+            } else {
+                $importService->import($this->task, $this->path);
+            }
         } catch (Throwable $exception) {
             $this->task->update(['status' => Task::STATUS_ERROR]);
             report($exception);
@@ -57,6 +67,14 @@ class ImportProjectExcelFileJob implements ShouldQueue
 
     private function prepareForImport(Task $task): void
     {
+        if ($this->isReimport) {
+            $task->update([
+                'status' => Task::STATUS_PROCESS,
+            ]);
+
+            return;
+        }
+
         $task->failedRows()->delete();
         $task->projects()->delete();
         $task->update([

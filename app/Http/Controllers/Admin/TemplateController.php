@@ -59,6 +59,7 @@ class TemplateController extends Controller
                         'key' => $column->key,
                         'data_type' => $column->data_type,
                         'is_required' => $column->is_required,
+                        'validation_rules' => $column->validation_rules ?? [],
                         'position' => $column->position,
                     ];
                 }),
@@ -112,6 +113,7 @@ class TemplateController extends Controller
                         'key' => $column['key'],
                         'data_type' => $column['data_type'],
                         'is_required' => (bool) ($column['is_required'] ?? false),
+                        'validation_rules' => $this->normalizeValidationRules($column['validation_rules'] ?? null),
                         'position' => $column['position'],
                     ]);
 
@@ -124,6 +126,7 @@ class TemplateController extends Controller
                 'key' => $column['key'],
                 'data_type' => $column['data_type'],
                 'is_required' => (bool) ($column['is_required'] ?? false),
+                'validation_rules' => $this->normalizeValidationRules($column['validation_rules'] ?? null),
                 'position' => $column['position'],
             ]);
         }
@@ -221,5 +224,40 @@ class TemplateController extends Controller
         }
 
         return $candidate;
+    }
+
+    private function normalizeValidationRules(mixed $rules): ?array
+    {
+        if (is_array($rules)) {
+            $rules = array_values(array_filter(array_map('trim', $rules)));
+            return $rules ?: null;
+        }
+
+        if (! is_string($rules)) {
+            return null;
+        }
+
+        $rules = trim($rules);
+        if ($rules === '') {
+            return null;
+        }
+
+        if (str_starts_with($rules, '[')) {
+            $decoded = json_decode($rules, true);
+            if (is_array($decoded)) {
+                $decoded = array_values(array_filter(array_map('trim', $decoded)));
+                return $decoded ?: null;
+            }
+        }
+
+        if (str_contains($rules, "\n")) {
+            $parts = preg_split("/\r\n|\n|\r/", $rules);
+        } else {
+            $parts = explode('|', $rules);
+        }
+
+        $parts = array_values(array_filter(array_map('trim', $parts)));
+
+        return $parts ?: null;
     }
 }

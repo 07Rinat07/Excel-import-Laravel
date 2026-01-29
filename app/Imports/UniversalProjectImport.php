@@ -7,10 +7,12 @@ use App\Models\ExcelTemplateColumn;
 use App\Models\Project;
 use App\Models\ProjectValue;
 use App\Models\Task;
+use App\Services\DataValidationService;
 use App\Services\Import\ImportFailureRecorder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Concerns\ToCollection;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithStartRow;
 use Maatwebsite\Excel\Events\BeforeSheet;
@@ -19,15 +21,21 @@ use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Events\AfterImport;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 
-class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, WithBatchInserts, WithChunkReading
+class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, WithBatchInserts, WithChunkReading, WithMultipleSheets
 {
     private Task $task;
 
     private ImportFailureRecorder $failureRecorder;
 
+    private DataValidationService $validationService;
+
     private ?ExcelTemplate $template = null;
 
     private array $columnMap = [];
+
+    private array $validationColumns = [];
+
+    private array $columnLabelsByKey = [];
 
     private array $missingRequired = [];
 
@@ -49,6 +57,7 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
     {
         $this->task = $task;
         $this->failureRecorder = $failureRecorder;
+        $this->validationService = app(DataValidationService::class);
         self::$headings = [];
         self::$currentSheetName = 'Sheet1';
         self::$currentSheetIndex = 0;
@@ -91,16 +100,17 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
             $this->totalRows++;
             $valuesByKey = $this->mapRowValuesByKey($values);
 
-            $rowFailures = $this->validateRow($values);
-            if ($rowFailures) {
-                foreach ($rowFailures as $failure) {
-                    $failures[] = [
-                        'row' => $rowNumber,
-                        'key' => $failure['key'],
-                        'message' => $failure['message'],
-                    ];
-                }
-
+            $validation = $this->validateRow($valuesByKey);
+            if (! $validation['valid']) {
+                $failures[] = [
+                    'row' => $rowNumber,
+                    'row_number' => $rowNumber,
+                    'data' => $valuesByKey,
+                    'errors' => $validation['errors'],
+                    'error_messages' => $validation['errors'],
+                    'key' => $validation['first_key'],
+                    'message' => $validation['first_message'] ?? 'Validation failed',
+                ];
                 $this->failedRows++;
                 continue;
             }
@@ -170,6 +180,13 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
         ];
     }
 
+    public function sheets(): array
+    {
+        $index = $this->task->selected_sheet_index ?? 0;
+
+        return [$index => $this];
+    }
+
     public static function beforeSheet(BeforeSheet $event): void
     {
         $worksheet = $event->getSheet()->getDelegate();
@@ -203,8 +220,11 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
                     continue;
                 }
                 $this->columnMap[(int) $index] = $column;
-                $mappedIds[] = $columnId;
-            }
+            $mappedIds[] = $columnId;
+        }
+
+            $this->validationColumns = $this->buildValidationColumns($this->columnMap);
+            $this->columnLabelsByKey = $this->buildColumnLabelMap($this->columnMap);
 
             $this->missingRequired = $template->columns()
                 ->where('is_required', true)
@@ -259,6 +279,8 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
         $template->update(['header_hash' => $hash]);
         $this->task->update(['template_id' => $template->id]);
         $this->template = $template;
+        $this->validationColumns = $this->buildValidationColumns($this->columnMap);
+        $this->columnLabelsByKey = $this->buildColumnLabelMap($this->columnMap);
         $this->missingRequired = $template->columns()
             ->where('is_required', true)
             ->whereNotIn('key', $headerKeys)
@@ -342,55 +364,82 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
         return $valuesByKey;
     }
 
-    private function validateRow(array $values): array
+    private function validateRow(array $valuesByKey): array
     {
-        $errors = [];
-
-        foreach ($this->columnMap as $index => $column) {
-            $value = $values[$index] ?? null;
-            $label = $column->label ?: $column->key;
-
-            if ($column->is_required && ($value === null || $value === '')) {
-                $errors[] = ['key' => $label, 'message' => 'Поле обязательно для заполнения.'];
-
-                continue;
-            }
-
-            if ($value === null || $value === '') {
-                continue;
-            }
-
-            $error = $this->validateType($value, $column->data_type);
-            if ($error) {
-                $errors[] = ['key' => $label, 'message' => $error];
-            }
+        $validation = $this->validationService->validateRow($valuesByKey, $this->validationColumns);
+        if ($validation['valid']) {
+            return [
+                'valid' => true,
+                'errors' => [],
+                'first_key' => null,
+                'first_message' => null,
+            ];
         }
 
-        return $errors;
+        $firstKey = null;
+        $firstMessage = null;
+        foreach ($validation['errors'] as $key => $messages) {
+            $firstKey = $this->columnLabelsByKey[$key] ?? $key;
+            $firstMessage = is_array($messages) ? ($messages[0] ?? null) : $messages;
+            break;
+        }
+
+        return [
+            'valid' => false,
+            'errors' => $validation['errors'],
+            'first_key' => $firstKey,
+            'first_message' => $firstMessage,
+        ];
     }
 
-    private function validateType(mixed $value, string $type): ?string
+    private function buildValidationColumns(array $columnMap): array
     {
-        $normalized = strtolower($type);
+        $columns = [];
+        foreach ($columnMap as $column) {
+            $rules = is_array($column->validation_rules) ? $column->validation_rules : [];
 
-        return match ($normalized) {
-            'number' => is_numeric($value) ? null : 'Ожидается число.',
-            'integer' => filter_var($value, FILTER_VALIDATE_INT) !== false ? null : 'Ожидается целое число.',
-            'date' => strtotime((string) $value) !== false ? null : 'Ожидается дата.',
-            'boolean' => $this->isBoolean($value) ? null : 'Ожидается логическое значение.',
+            if ($column->is_required && ! in_array('required', $rules, true)) {
+                $rules[] = 'required';
+            }
+
+            $typeRule = $this->mapTypeToRule((string) $column->data_type);
+            if ($typeRule) {
+                $rules[] = $typeRule;
+            }
+
+            if (! in_array('required', $rules, true)) {
+                $rules[] = 'nullable';
+            }
+
+            $columns[] = [
+                'key' => $column->key,
+                'label' => $column->label,
+                'validation_rules' => $rules,
+            ];
+        }
+
+        return $columns;
+    }
+
+    private function buildColumnLabelMap(array $columnMap): array
+    {
+        $labels = [];
+        foreach ($columnMap as $column) {
+            $labels[$column->key] = $column->label ?: $column->key;
+        }
+
+        return $labels;
+    }
+
+    private function mapTypeToRule(string $type): ?string
+    {
+        return match (strtolower($type)) {
+            'number' => 'numeric',
+            'integer' => 'integer',
+            'date' => 'date',
+            'boolean' => 'boolean',
             default => null,
         };
-    }
-
-    private function isBoolean(mixed $value): bool
-    {
-        if (is_bool($value)) {
-            return true;
-        }
-
-        $normalized = strtolower(trim((string) $value));
-
-        return in_array($normalized, ['1', '0', 'true', 'false', 'yes', 'no', 'да', 'нет'], true);
     }
 
     private function resolveDate(array $valuesByKey, array $keys, \DateTimeInterface $fallback): string

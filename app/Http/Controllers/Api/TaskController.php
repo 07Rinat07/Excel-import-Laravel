@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\FailedRow\FailedRowResource;
 use App\Http\Resources\Task\TaskResource;
-use App\Models\FailedRow;
 use App\Models\Task;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -65,7 +64,7 @@ class TaskController extends Controller
     {
         $this->authorize('view', $task);
 
-        $failedRows = FailedRow::where('task_id', $task->id)->paginate(10);
+        $failedRows = $task->failedRows()->paginate(10);
 
         return FailedRowResource::collection($failedRows);
     }

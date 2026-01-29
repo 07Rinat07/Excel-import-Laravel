@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\FeedbackController as AdminFeedbackController;
 use App\Http\Controllers\Admin\TemplateController as AdminTemplateController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ExportSelectionController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
@@ -51,12 +52,27 @@ Route::middleware(['auth', 'not_blocked'])->group(function () {
     Route::get('/projects', [ProjectController::class, 'index'])->name('project.index');
     Route::get('/projects/import', [ProjectController::class, 'import'])->name('project.import');
     Route::post('/projects/import', [ProjectController::class, 'importStore'])->name('project.import.store');
+    Route::post('/projects/import/prepare', [ProjectController::class, 'importPrepare'])->name('project.import.prepare');
     Route::get('/projects/import/{task}/map', [ProjectController::class, 'importMap'])->name('project.import.map');
     Route::post('/projects/import/{task}/map', [ProjectController::class, 'importMapStore'])->name('project.import.map.store');
+    Route::post('/projects/import/{task}/map-json', [ProjectController::class, 'importMapStoreJson'])->name('project.import.map.json');
+
+    // Export selection routes
+    Route::get('/projects/{project}/export-select', [ExportSelectionController::class, 'projectSelection'])->name('project.export.select');
+    Route::post('/projects/{project}/export-select', [ExportSelectionController::class, 'projectExport'])->name('project.export.select.store');
     Route::get('/projects/{project}/export/{format}', [ProjectExportController::class, 'project'])->name('project.export');
+
     Route::get('/tasks', [TaskController::class, 'index'])->name('task.index');
     Route::get('/tasks/{task}/failed_list', [TaskController::class, 'failedList'])->name('task.failed_list');
+
+    // Task export selection routes
+    Route::get('/tasks/{task}/export-select', [ExportSelectionController::class, 'taskSelection'])->name('task.export.select');
+    Route::post('/tasks/{task}/export-select', [ExportSelectionController::class, 'taskExport'])->name('task.export.select.store');
     Route::get('/tasks/{task}/export/{format}', [ProjectExportController::class, 'task'])->name('task.export');
+
+    // Type export selection routes
+    Route::get('/types/{type}/export-select', [ExportSelectionController::class, 'typeSelection'])->name('type.export.select');
+    Route::post('/types/{type}/export-select', [ExportSelectionController::class, 'typeExport'])->name('type.export.select.store');
     Route::get('/types/{type}/export/{format}', [ProjectExportController::class, 'type'])->name('type.export');
 });
 

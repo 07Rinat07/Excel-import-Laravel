@@ -15,7 +15,7 @@ class CreateApiTokenCommand extends Command
     {
         $email = (string) $this->argument('email');
         $name = (string) $this->argument('name');
-        $abilitiesOption = (string) $this->option('abilities');
+        $abilitiesOption = $this->option('abilities');
         $expiresDays = $this->option('expires');
 
         $user = User::query()->where('email', $email)->first();
@@ -25,7 +25,12 @@ class CreateApiTokenCommand extends Command
             return Command::FAILURE;
         }
 
-        $abilities = $abilitiesOption === '*' ? ['*'] : array_filter(array_map('trim', explode(',', $abilitiesOption)));
+        if (is_array($abilitiesOption)) {
+            $abilities = array_values(array_filter(array_map('trim', $abilitiesOption)));
+        } else {
+            $abilitiesOption = (string) $abilitiesOption;
+            $abilities = $abilitiesOption === '*' ? ['*'] : array_filter(array_map('trim', explode(',', $abilitiesOption)));
+        }
         if (! $abilities) {
             $abilities = ['*'];
         }

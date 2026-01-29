@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Task extends Model
 {
+    use HasFactory;
     protected $fillable = [
         'user_id',
         'file_id',
@@ -17,6 +19,11 @@ class Task extends Model
         'column_map',
         'total_rows',
         'imported_rows',
+        'name',
+        'mapping',
+        'available_sheets',
+        'selected_sheet_index',
+        'sheet',
     ];
 
     protected $table = 'tasks';
@@ -24,8 +31,11 @@ class Task extends Model
     protected $casts = [
         'status' => 'integer',
         'column_map' => 'array',
+        'mapping' => 'array',
+        'available_sheets' => 'array',
         'total_rows' => 'integer',
         'imported_rows' => 'integer',
+        'selected_sheet_index' => 'integer',
     ];
 
     const STATUS_PENDING = 0;

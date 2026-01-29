@@ -8,6 +8,7 @@ use App\Models\ExportLog;
 use App\Models\ExcelTemplate;
 use App\Models\Task;
 use App\Models\Type;
+use App\Models\User;
 use App\Services\Export\ProjectExportService;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -113,6 +114,14 @@ class ExportController extends Controller
             'exports' => $exports,
             'types' => $types,
             'tasks' => $tasks,
+            'users' => User::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'email'])
+                ->map(fn (User $user) => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ])->all(),
         ]);
     }
 
@@ -124,6 +133,9 @@ class ExportController extends Controller
         $format = $data['format'];
         $columnIds = array_values(array_unique($data['columns']));
         $labels = $data['labels'] ?? [];
+        $userId = isset($data['user_id']) ? (int) $data['user_id'] : null;
+        $sheetName = $data['sheet_name'] ?? null;
+        $sheetIndex = isset($data['sheet_index']) ? (int) $data['sheet_index'] : null;
 
         if ($sourceType === 'type') {
             $type = Type::findOrFail($sourceId);
@@ -138,7 +150,7 @@ class ExportController extends Controller
             $labels = $this->filterLabels($labels, $columnIds);
             $filename = "type-{$type->id}-custom.{$format}";
             try {
-                $response = $service->exportCustomByType($type, $format, $columnIds, $labels, $request->user());
+                $response = $service->exportCustomByType($type, $format, $columnIds, $labels, $request->user(), $userId, $sheetName, $sheetIndex);
                 $this->logExport($request->user(), 'type', $type->id, $format, 'success', $filename);
 
                 return $response;
@@ -158,8 +170,8 @@ class ExportController extends Controller
         $labels = $this->filterLabels($labels, $columnIds);
         $filename = "task-{$task->id}-custom.{$format}";
         try {
-            $response = $service->exportCustomByTask($task, $format, $columnIds, $labels);
-            $this->logExport($request->user(), 'task', $task->id, $format, 'success', $filename);
+        $response = $service->exportCustomByTask($task, $format, $columnIds, $labels, $sheetName, $sheetIndex);
+        $this->logExport($request->user(), 'task', $task->id, $format, 'success', $filename);
 
             return $response;
         } catch (\Throwable $e) {

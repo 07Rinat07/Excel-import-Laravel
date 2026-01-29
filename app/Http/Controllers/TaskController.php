@@ -33,6 +33,22 @@ class TaskController extends Controller
 
         $failedList = FailedRowResource::collection($failedRows);
 
-        return inertia('Task/FailedList', compact('failedList'));
+        $templateColumns = $task->template
+            ? $task->template->columns()->orderBy('position')->get()->map(function ($column) {
+                return [
+                    'key' => $column->key,
+                    'label' => $column->label,
+                    'data_type' => $column->data_type,
+                    'is_required' => (bool) $column->is_required,
+                    'validation_rules' => $column->validation_rules ?? [],
+                ];
+            })
+            : collect();
+
+        return inertia('Task/FailedList', [
+            'failedList' => $failedList,
+            'taskId' => $task->id,
+            'templateColumns' => $templateColumns,
+        ]);
     }
 }

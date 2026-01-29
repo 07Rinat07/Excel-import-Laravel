@@ -25,50 +25,50 @@ class ProjectExportService
         return $this->downloadQuery($projectsQuery, $template, $format, "project-{$project->id}");
     }
 
-    public function exportByTask(Task $task, string $format): BinaryFileResponse
+    public function exportByTask(Task $task, string $format, ?string $sheetName = null, ?int $sheetIndex = null): BinaryFileResponse
     {
         $template = $this->resolveTemplate($task->template_id, $task->type_id);
         $projectsQuery = Project::query()
             ->where('task_id', $task->id)
             ->latest('id');
+        $projectsQuery = $this->applySheetFilter($projectsQuery, $sheetName, $sheetIndex);
 
         return $this->downloadQuery($projectsQuery, $template, $format, "task-{$task->id}");
     }
 
-    public function exportByType(Type $type, string $format, ?User $user = null): BinaryFileResponse
+    public function exportByType(Type $type, string $format, ?User $user = null, ?int $userId = null, ?string $sheetName = null, ?int $sheetIndex = null): BinaryFileResponse
     {
         $template = $this->resolveTemplate(null, $type->id);
         $projectsQuery = Project::query()
             ->where('type_id', $type->id)
             ->latest('id');
 
-        if ($user && ! $user->isAdmin()) {
-            $projectsQuery = $projectsQuery->visibleTo($user);
-        }
+        $projectsQuery = $this->applyUserFilter($projectsQuery, $user, $userId);
+        $projectsQuery = $this->applySheetFilter($projectsQuery, $sheetName, $sheetIndex);
 
         return $this->downloadQuery($projectsQuery, $template, $format, "type-{$type->id}");
     }
 
-    public function exportCustomByTask(Task $task, string $format, array $columnIds, array $labels = []): BinaryFileResponse
+    public function exportCustomByTask(Task $task, string $format, array $columnIds, array $labels = [], ?string $sheetName = null, ?int $sheetIndex = null): BinaryFileResponse
     {
         $template = $this->resolveTemplate($task->template_id, $task->type_id);
         $projectsQuery = Project::query()
             ->where('task_id', $task->id)
             ->latest('id');
+        $projectsQuery = $this->applySheetFilter($projectsQuery, $sheetName, $sheetIndex);
 
         return $this->downloadCustomQuery($projectsQuery, $template, $format, "task-{$task->id}-custom", $columnIds, $labels);
     }
 
-    public function exportCustomByType(Type $type, string $format, array $columnIds, array $labels = [], ?User $user = null): BinaryFileResponse
+    public function exportCustomByType(Type $type, string $format, array $columnIds, array $labels = [], ?User $user = null, ?int $userId = null, ?string $sheetName = null, ?int $sheetIndex = null): BinaryFileResponse
     {
         $template = $this->resolveTemplate(null, $type->id);
         $projectsQuery = Project::query()
             ->where('type_id', $type->id)
             ->latest('id');
 
-        if ($user && ! $user->isAdmin()) {
-            $projectsQuery = $projectsQuery->visibleTo($user);
-        }
+        $projectsQuery = $this->applyUserFilter($projectsQuery, $user, $userId);
+        $projectsQuery = $this->applySheetFilter($projectsQuery, $sheetName, $sheetIndex);
 
         return $this->downloadCustomQuery($projectsQuery, $template, $format, "type-{$type->id}-custom", $columnIds, $labels);
     }
@@ -230,5 +230,34 @@ class ProjectExportService
         $usedTitles[] = $candidate;
 
         return $candidate;
+    }
+
+    private function applyUserFilter(Builder $query, ?User $actor, ?int $userId): Builder
+    {
+        if ($userId) {
+            return $query->whereHas('task', function (Builder $taskQuery) use ($userId) {
+                $taskQuery->where('user_id', $userId);
+            });
+        }
+
+        if ($actor && ! $actor->isAdmin()) {
+            return $query->visibleTo($actor);
+        }
+
+        return $query;
+    }
+
+    private function applySheetFilter(Builder $query, ?string $sheetName, ?int $sheetIndex): Builder
+    {
+        $sheetName = is_string($sheetName) ? trim($sheetName) : null;
+        if ($sheetName !== null && $sheetName !== '') {
+            return $query->where('sheet_name', $sheetName);
+        }
+
+        if ($sheetIndex !== null) {
+            return $query->where('sheet_index', $sheetIndex);
+        }
+
+        return $query;
     }
 }

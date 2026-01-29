@@ -31,6 +31,7 @@ class TemplateUpdateRequest extends FormRequest
             'columns.*.key' => 'nullable|string|max:255',
             'columns.*.data_type' => 'required|string|in:string,number,integer,date,boolean',
             'columns.*.is_required' => 'boolean',
+            'columns.*.validation_rules' => 'nullable|string|max:500',
             'columns.*.position' => 'integer|min:0',
             'deleted_ids' => 'array',
             'deleted_ids.*' => [

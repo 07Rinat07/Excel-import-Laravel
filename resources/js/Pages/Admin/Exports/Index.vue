@@ -27,7 +27,7 @@
                 </button>
             </div>
 
-            <div class="mt-6 grid gap-4 lg:grid-cols-[1.2fr_1fr_0.6fr]">
+            <div class="mt-6 grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr_1fr_0.6fr]">
                 <div>
                     <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('admin.exportsSourceLabel') }}</label>
                     <div class="mt-2 grid gap-3 sm:grid-cols-2">
@@ -49,6 +49,18 @@
                 </div>
 
                 <div>
+                    <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('admin.exportsUserLabel') }}</label>
+                    <div class="mt-2">
+                        <select v-model="userId" class="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm" :disabled="sourceType !== 'type'">
+                            <option value="">{{ $t('admin.exportsUserPlaceholder') }}</option>
+                            <option v-for="user in users" :key="user.id" :value="user.id">
+                                {{ user.name }}{{ user.email ? ` (${user.email})` : '' }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
                     <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('admin.exportsFormatLabel') }}</label>
                     <div class="mt-2">
                         <select v-model="format" class="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm">
@@ -56,6 +68,18 @@
                             <option value="csv">CSV</option>
                             <option value="tsv">TSV</option>
                         </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('admin.exportsSheetLabel') }}</label>
+                    <div class="mt-2">
+                        <input
+                            v-model="sheetName"
+                            type="text"
+                            class="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm"
+                            :placeholder="$t('admin.exportsSheetPlaceholder')"
+                        />
                     </div>
                 </div>
 
@@ -217,11 +241,14 @@ export default {
         exports: Object,
         types: Array,
         tasks: Array,
+        users: Array,
     },
     data() {
         return {
             sourceType: 'type',
             sourceId: '',
+            userId: '',
+            sheetName: '',
             format: 'xlsx',
             selectedColumns: {},
             customLabels: {},
@@ -285,6 +312,12 @@ export default {
             params.set('source_type', this.sourceType);
             params.set('source_id', this.sourceId);
             params.set('format', this.format);
+            if (this.userId && this.sourceType === 'type') {
+                params.set('user_id', this.userId);
+            }
+            if (this.sheetName.trim() !== '') {
+                params.set('sheet_name', this.sheetName.trim());
+            }
 
             this.currentColumns.forEach((column) => {
                 if (!this.selectedColumns[column.id]) {
@@ -305,6 +338,7 @@ export default {
             this.sourceId = '';
             this.selectedColumns = {};
             this.customLabels = {};
+            this.userId = '';
         },
         sourceId() {
             this.selectedColumns = {};
