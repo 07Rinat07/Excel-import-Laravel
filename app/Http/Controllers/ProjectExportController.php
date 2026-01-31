@@ -9,6 +9,7 @@ use App\Models\Type;
 use App\Services\Export\ProjectExportService;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Illuminate\Http\Response;
 
 class ProjectExportController extends Controller
 {
@@ -17,6 +18,29 @@ class ProjectExportController extends Controller
     public function __construct(ProjectExportService $service)
     {
         $this->service = $service;
+    }
+
+    public function exportView(Request $request, string $viewName, string $format): BinaryFileResponse|Response
+    {
+        $this->authorize('export-view');
+        $format = $this->normalizeFormat($format);
+        $this->ensureViewIsAllowed($viewName);
+        $filenamePrefix = "custom-export-{$viewName}";
+
+        $data = $request->input('data', []);
+        if (! is_array($data)) {
+            $data = [];
+        }
+
+        try {
+            $response = $this->service->exportFromView($viewName, $data, $format, $filenamePrefix, [], $request->has('queue'));
+            $this->logExport($request->user(), 'view', 0, $format, 'success', $filenamePrefix . '.' . $format);
+
+            return $response;
+        } catch (\Throwable $e) {
+            $this->logExport($request->user(), 'view', 0, $format, 'failed', $filenamePrefix . '.' . $format);
+            throw $e;
+        }
     }
 
     public function project(Request $request, Project $project, string $format): BinaryFileResponse
@@ -90,5 +114,30 @@ class ProjectExportController extends Controller
             'status' => $status,
             'file_name' => $fileName,
         ]);
+    }
+
+    private function ensureViewIsAllowed(string $viewName): void
+    {
+        if (! $this->isValidViewName($viewName)) {
+            abort(404);
+        }
+
+        $allowed = config('exports.view_allowlist', []);
+        if (! in_array($viewName, $allowed, true)) {
+            abort(404);
+        }
+
+        if (! view()->exists($viewName)) {
+            abort(404);
+        }
+    }
+
+    private function isValidViewName(string $viewName): bool
+    {
+        if ($viewName === '' || str_contains($viewName, '..')) {
+            return false;
+        }
+
+        return (bool) preg_match('/^[A-Za-z0-9._-]+$/', $viewName);
     }
 }

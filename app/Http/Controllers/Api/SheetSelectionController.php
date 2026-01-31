@@ -23,7 +23,8 @@ class SheetSelectionController extends Controller
      */
     public function getAvailableSheets(Request $request, File $file): JsonResponse
     {
-        $path = Storage::disk('public')->path($file->path);
+        $this->authorizeFileAccess($request, $file);
+        $path = $this->resolveFilePath($file);
         $sheets = $this->sheetService->getAvailableSheets($path);
 
         if (empty($sheets)) {
@@ -56,11 +57,12 @@ class SheetSelectionController extends Controller
      */
     public function getSheetHeaders(Request $request, File $file): JsonResponse
     {
+        $this->authorizeFileAccess($request, $file);
         $validated = $request->validate([
             'sheet_index' => 'required|integer|min:0',
         ]);
 
-        $path = Storage::disk('public')->path($file->path);
+        $path = $this->resolveFilePath($file);
         if (!$this->sheetService->validateSheetIndex($path, $validated['sheet_index'])) {
             return response()->json([
                 'success' => false,
@@ -87,12 +89,13 @@ class SheetSelectionController extends Controller
      */
     public function getSheetPreview(Request $request, File $file): JsonResponse
     {
+        $this->authorizeFileAccess($request, $file);
         $validated = $request->validate([
             'sheet_index' => 'required|integer|min:0',
             'rows_count' => 'integer|min:1|max:50',
         ]);
 
-        $path = Storage::disk('public')->path($file->path);
+        $path = $this->resolveFilePath($file);
         if (!$this->sheetService->validateSheetIndex($path, $validated['sheet_index'])) {
             return response()->json([
                 'success' => false,
@@ -129,13 +132,14 @@ class SheetSelectionController extends Controller
      */
     public function selectSheetForImport(Request $request, File $file): JsonResponse
     {
+        $this->authorizeFileAccess($request, $file);
         $validated = $request->validate([
             'sheet_index' => 'required|integer|min:0',
             'template_id' => 'required|integer|exists:excel_templates,id',
             'task_name' => 'nullable|string|max:255',
         ]);
 
-        $path = Storage::disk('public')->path($file->path);
+        $path = $this->resolveFilePath($file);
         if (!$this->sheetService->validateSheetIndex($path, $validated['sheet_index'])) {
             return response()->json([
                 'success' => false,
@@ -191,5 +195,32 @@ class SheetSelectionController extends Controller
                 'mapping_suggestion' => $mappingSuggestion,
             ],
         ]);
+    }
+
+    private function authorizeFileAccess(Request $request, File $file): void
+    {
+        $user = $request->user();
+        if (! $user) {
+            abort(403);
+        }
+
+        if ($user->isAdmin()) {
+            return;
+        }
+
+        $hasAccess = Task::query()
+            ->where('file_id', $file->id)
+            ->where('user_id', $user->id)
+            ->exists();
+
+        if (! $hasAccess) {
+            abort(403);
+        }
+    }
+
+    private function resolveFilePath(File $file): string
+    {
+        $disk = config('imports.disk', 'public');
+        return Storage::disk($disk)->path($file->path);
     }
 }

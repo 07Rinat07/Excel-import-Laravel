@@ -4,11 +4,13 @@ namespace App\Jobs;
 
 use App\Models\Task;
 use App\Services\ProjectImportServiceInterface;
+use App\Services\SheetProcessingService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class ImportProjectExcelFileJob implements ShouldQueue
@@ -77,9 +79,20 @@ class ImportProjectExcelFileJob implements ShouldQueue
 
         $task->failedRows()->delete();
         $task->projects()->delete();
+        $totalRows = 0;
+        if ($task->file?->path) {
+            $disk = config('imports.disk', 'public');
+            $path = Storage::disk($disk)->path($task->file->path);
+            $sheetIndex = $task->selected_sheet_index ?? 0;
+            $sheetService = app(SheetProcessingService::class);
+            $stats = $sheetService->getSheetStatistics($path, $sheetIndex);
+            $headerRow = $sheetService->getHeaderRowIndex($path, $sheetIndex);
+            $estimatedTotal = (int) ($stats['total_rows'] ?? 0) - $headerRow;
+            $totalRows = max(0, $estimatedTotal);
+        }
         $task->update([
             'status' => Task::STATUS_PROCESS,
-            'total_rows' => 0,
+            'total_rows' => $totalRows,
             'imported_rows' => 0,
         ]);
     }

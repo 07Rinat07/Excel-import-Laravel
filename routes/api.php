@@ -54,6 +54,7 @@ Route::middleware(['auth:sanctum', 'not_blocked'])->group(function () {
         Route::get('/projects/{project}/export/report', [EnhancedExportController::class, 'exportReport'])->name('api.export.report');
         Route::get('/projects/{project}/export/validated', [EnhancedExportController::class, 'exportWithValidation'])->name('api.export.validated');
 
+        Route::get('/exports/view/{viewName}/{format}', [ProjectExportController::class, 'exportView'])->name('api.exports.view');
         Route::get('/projects/{project}/export/{format}', [ProjectExportController::class, 'project'])->name('api.projects.export');
         Route::get('/tasks/{task}/export/{format}', [ProjectExportController::class, 'task'])->name('api.tasks.export');
         Route::get('/types/{type}/export/{format}', [ProjectExportController::class, 'type'])->name('api.types.export');

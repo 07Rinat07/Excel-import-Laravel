@@ -232,7 +232,8 @@ class ProjectController extends Controller
         $availableSheets = [];
         $selectedSheetIndex = null;
 
-        $path = Storage::disk('public')->path($file->path);
+        $disk = config('imports.disk', 'public');
+        $path = Storage::disk($disk)->path($file->path);
         $availableSheets = $sheetService->getAvailableSheets($path);
         if ($availableSheets) {
             $selectedSheetIndex = $sheetService->findBestSheet($path);
@@ -325,7 +326,8 @@ class ProjectController extends Controller
         $selectedSheetIndex = $task->selected_sheet_index ?? null;
 
         if ($task->file) {
-            $path = Storage::disk('public')->path($task->file->path);
+            $disk = config('imports.disk', 'public');
+            $path = Storage::disk($disk)->path($task->file->path);
             $availableSheets = $sheetService->getAvailableSheets($path);
             $requestedIndex = $request->query('sheet_index');
             if ($requestedIndex !== null) {

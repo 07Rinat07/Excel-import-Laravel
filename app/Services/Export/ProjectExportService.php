@@ -9,6 +9,8 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\Type;
 use App\Models\User;
+use App\Exports\ProjectValuesViewExport;
+use App\Jobs\ProcessExportJob;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Facades\Excel;
@@ -16,6 +18,29 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ProjectExportService
 {
+    private const QUEUE_THRESHOLD = 1000; // Number of projects to trigger queuing
+    private const QUEUE_DELAY = 5; // Delay in seconds before the job is processed
+    private const QUEUE_CONNECTION = 'database'; // Or 'redis', 'sqs', etc.
+    private const QUEUE_NAME = 'exports'; // Specific queue name
+
+    public function exportFromView(string $view, array $data, string $format, string $filenamePrefix, array $columnWidths = [], bool $queue = false): BinaryFileResponse
+    {
+        $filename = $filenamePrefix . '.' . $this->normalizeFormat($format);
+        $writerType = $this->writerType($format);
+
+        if ($queue) {
+            ProcessExportJob::dispatch($view, $data, $format, $filenamePrefix, $columnWidths)
+                ->delay(now()->addSeconds(self::QUEUE_DELAY))
+                ->onConnection(self::QUEUE_CONNECTION)
+                ->onQueue(self::QUEUE_NAME);
+
+            // Return a response indicating that the export has been queued
+            abort(202, 'Export has been queued and will be processed shortly.');
+        }
+
+        return Excel::download(new ProjectValuesViewExport($view, $data, $columnWidths), $filename, $writerType);
+    }
+
     public function exportByProject(Project $project, string $format): BinaryFileResponse
     {
         $template = $this->resolveTemplate($project->template_id, $project->type_id);
@@ -23,6 +48,15 @@ class ProjectExportService
             ->whereKey($project->id);
 
         return $this->downloadQuery($projectsQuery, $template, $format, "project-{$project->id}");
+    }
+
+    public function exportCustomByProject(Project $project, string $format, array $columnIds, array $labels = []): BinaryFileResponse
+    {
+        $template = $this->resolveTemplate($project->template_id, $project->type_id);
+        $projectsQuery = Project::query()
+            ->whereKey($project->id);
+
+        return $this->downloadCustomQuery($projectsQuery, $template, $format, "project-{$project->id}-custom", $columnIds, $labels);
     }
 
     public function exportByTask(Task $task, string $format, ?string $sheetName = null, ?int $sheetIndex = null): BinaryFileResponse
@@ -136,7 +170,7 @@ class ProjectExportService
         }]);
     }
 
-    private function normalizeFormat(string $format): string
+    public function normalizeFormat(string $format): string
     {
         $format = strtolower($format);
         if ($format === 'csv') return 'csv';
@@ -144,7 +178,7 @@ class ProjectExportService
         return 'xlsx';
     }
 
-    private function writerType(string $format): string
+    public function writerType(string $format): string
     {
         $format = strtolower($format);
         if ($format === 'csv') return \Maatwebsite\Excel\Excel::CSV;

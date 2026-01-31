@@ -22,7 +22,8 @@ class ProjectImportService implements ProjectImportServiceInterface
     public function import(Task $task, string $path): void
     {
         $importer = new UniversalProjectImport($task, $this->failureRecorder);
-        Excel::import($importer, $path, 'public');
+        $disk = config('imports.disk', 'public');
+        Excel::import($importer, $path, $disk);
     }
 
     public function reimportCorrectedRows(Task $task, array $correctedRows): void

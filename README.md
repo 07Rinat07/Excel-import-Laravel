@@ -167,6 +167,12 @@ Laravel-приложение для импорта файлов XLSX/XLS/XLSM/CS
 * `php artisan migrate`
 * `php artisan queue:work --queue=imports`
 
+## Безопасность импорта/экспорта
+* Приватное хранение файлов импорта: установите `IMPORTS_DISK=imports` (см. `config/filesystems.php`).  
+  По умолчанию используется `public`, но для продакшена безопаснее хранить файлы в приватном диске.
+* Экспорт из Blade‑view ограничен allowlist‑ом (`config/exports.php`, ключ `view_allowlist`).  
+  Добавляйте только специальные экспортные шаблоны (например, `exports.test-report`).
+
 ## Линтинг / Форматирование
 * `./vendor/bin/pint`
 

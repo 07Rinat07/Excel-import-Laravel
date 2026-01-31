@@ -153,6 +153,10 @@ class UniversalProjectImport implements ToCollection, WithEvents, WithStartRow, 
         if ($failures) {
             $this->failureRecorder->recordCustomFailures($failures, $this->task);
         }
+
+        $this->task->update([
+            'imported_rows' => $this->importedRows,
+        ]);
     }
 
     public function startRow(): int

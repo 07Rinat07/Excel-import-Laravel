@@ -10,8 +10,12 @@ use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithTitle;
+use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class ProjectValuesQueryExport implements FromQuery, WithMapping, WithHeadings, WithChunkReading, WithTitle
+class ProjectValuesQueryExport implements FromQuery, WithMapping, WithHeadings, WithChunkReading, WithTitle, WithStyles, WithColumnWidths
 {
     private Builder $query;
 
@@ -69,5 +73,23 @@ class ProjectValuesQueryExport implements FromQuery, WithMapping, WithHeadings, 
     public function title(): string
     {
         return $this->title ?? 'Sheet1';
+    }
+
+    public function styles(Worksheet $sheet)
+    {
+        return [
+            // Style the first row as bold text.
+            1    => ['font' => ['bold' => true]],
+        ];
+    }
+
+    public function columnWidths(): array
+    {
+        // Auto-size columns based on content
+        $widths = [];
+        foreach ($this->columns as $index => $column) {
+            $widths[Coordinate::stringFromColumnIndex($index + 1)] = 20;
+        }
+        return $widths;
     }
 }

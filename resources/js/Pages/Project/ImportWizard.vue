@@ -263,10 +263,41 @@
             </div>
         </section>
 
+        <section v-else-if="step === 'processing'" class="rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-lg shadow-slate-200/40">
+            <h2 class="text-lg font-semibold text-slate-900">{{ $t('project.importProcessingTitle') }}</h2>
+            <p class="mt-2 text-sm text-slate-600">
+                {{ $t('project.importProcessingSubtitle') }}
+            </p>
+
+            <div class="mt-6">
+                <div class="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                    <div
+                        class="h-full rounded-full bg-slate-900 transition-all duration-500"
+                        :class="progressIndeterminate ? 'animate-pulse' : ''"
+                        :style="{ width: `${progressPercent}%` }"
+                    ></div>
+                </div>
+                <div class="mt-2 text-xs text-slate-500">
+                    <span v-if="progressIndeterminate">{{ $t('project.importProcessingPending') }}</span>
+                    <span v-else>{{ progressPercent }}%</span>
+                </div>
+            </div>
+
+            <div v-if="notification.message" class="mt-4 rounded-xl border px-4 py-3 text-xs" :class="notificationClass">
+                {{ notification.message }}
+            </div>
+
+            <div class="mt-6 flex flex-wrap gap-3">
+                <Link class="rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700" :href="route('task.index')">
+                    {{ $t('task.title') }}
+                </Link>
+            </div>
+        </section>
+
         <section v-else class="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-6 shadow-lg shadow-emerald-200/40">
-            <h2 class="text-lg font-semibold text-emerald-800">{{ $t('project.importStatus.processing') }}</h2>
+            <h2 class="text-lg font-semibold text-emerald-800">{{ $t('project.importProcessingDone') }}</h2>
             <p class="mt-2 text-sm text-emerald-700">
-                {{ $t('home.queueFirstBody') }}
+                {{ $t('project.importProcessingDoneSubtitle') }}
             </p>
             <div class="mt-4 flex flex-wrap gap-3">
                 <Link class="rounded-full border border-emerald-300 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700" :href="route('task.index')">
@@ -315,6 +346,13 @@ export default {
             mapping_suggestion: null,
             template_columns: {},
             columns: [],
+            progressPercent: 0,
+            progressIndeterminate: true,
+            pollTimer: null,
+            notification: {
+                type: '',
+                message: '',
+            },
         };
     },
     computed: {
@@ -330,6 +368,16 @@ export default {
         sheetNames() {
             return this.available_sheets.map((sheet) => sheet.name);
         },
+        notificationClass() {
+            return this.notification.type === 'error'
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-700';
+        },
+    },
+    beforeUnmount() {
+        if (this.pollTimer) {
+            clearInterval(this.pollTimer);
+        }
     },
     methods: {
         stepClass(name) {
@@ -445,7 +493,8 @@ export default {
                     },
                     { headers: { 'Accept': 'application/json' } }
                 );
-                this.step = 'done';
+                this.step = 'processing';
+                this.startPolling();
             } catch (error) {
                 const errors = error.response?.data?.errors;
                 if (errors && typeof errors === 'object') {
@@ -461,6 +510,58 @@ export default {
             } finally {
                 this.loading = false;
             }
+        },
+        startPolling() {
+            if (!this.task?.id) {
+                return;
+            }
+            this.fetchTaskStatus();
+            if (this.pollTimer) {
+                clearInterval(this.pollTimer);
+            }
+            this.pollTimer = setInterval(this.fetchTaskStatus, 2000);
+        },
+        async fetchTaskStatus() {
+            try {
+                const response = await axios.get(route('task.status', this.task.id), {
+                    headers: { 'Accept': 'application/json' },
+                });
+                const task = response.data?.data || response.data;
+                const total = Number(task.total_rows || 0);
+                const imported = Number(task.imported_rows || 0);
+                if (total > 0) {
+                    this.progressIndeterminate = false;
+                    this.progressPercent = Math.min(100, Math.round((imported / total) * 100));
+                } else {
+                    this.progressIndeterminate = true;
+                    this.progressPercent = 15;
+                }
+
+                if (task.status_code === 2) {
+                    this.notification = {
+                        type: 'success',
+                        message: this.$t('project.importProcessingDone'),
+                    };
+                    this.finishPolling();
+                } else if (task.status_code === 3) {
+                    this.notification = {
+                        type: 'error',
+                        message: this.$t('project.importProcessingFailed'),
+                    };
+                    this.finishPolling();
+                }
+            } catch (error) {
+                // Silent retry
+            }
+        },
+        finishPolling() {
+            if (this.pollTimer) {
+                clearInterval(this.pollTimer);
+                this.pollTimer = null;
+            }
+            setTimeout(() => {
+                this.$inertia.visit(route('task.index'));
+            }, 2500);
         },
         getPreviewCell(row, columnIndex) {
             if (!Array.isArray(row)) {

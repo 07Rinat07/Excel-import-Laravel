@@ -5,12 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\Type;
-use App\Models\ExcelTemplate;
+use App\Services\Export\ProjectExportService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use PhpOffice\PhpSpreadsheet\Writer\Csv;
 
 class ExportSelectionController extends Controller
 {
@@ -41,13 +38,13 @@ class ExportSelectionController extends Controller
     /**
      * Store export selection and download file for project
      */
-    public function projectExport(Request $request, Project $project)
+    public function projectExport(Request $request, Project $project, ProjectExportService $service)
     {
         $this->authorize('view', $project);
 
         $validated = $request->validate([
             'columns' => 'required|array|min:1',
-            'columns.*' => 'required|string',
+            'columns.*' => 'required|integer',
             'format' => 'required|in:xlsx,csv,tsv',
         ]);
 
@@ -56,23 +53,9 @@ class ExportSelectionController extends Controller
             return redirect()->back()->withErrors(['error' => 'Template not found']);
         }
 
-        $selectedColumnIds = $validated['columns'];
-        $selectedColumns = $template->columns()
-            ->whereIn('id', $selectedColumnIds)
-            ->get();
+        $selectedColumnIds = $this->filterColumns($validated['columns'], $template);
 
-        if ($selectedColumns->isEmpty()) {
-            return redirect()->back()->withErrors(['error' => 'No columns selected']);
-        }
-
-        $data = $this->prepareExportData($project, $selectedColumns);
-
-        return $this->downloadExcel(
-            $data,
-            $selectedColumns,
-            "project-{$project->id}",
-            $validated['format']
-        );
+        return $service->exportCustomByProject($project, $validated['format'], $selectedColumnIds);
     }
 
     /**
@@ -102,13 +85,13 @@ class ExportSelectionController extends Controller
     /**
      * Store export selection and download file for task
      */
-    public function taskExport(Request $request, Task $task)
+    public function taskExport(Request $request, Task $task, ProjectExportService $service)
     {
         $this->authorize('view', $task);
 
         $validated = $request->validate([
             'columns' => 'required|array|min:1',
-            'columns.*' => 'required|string',
+            'columns.*' => 'required|integer',
             'format' => 'required|in:xlsx,csv,tsv',
         ]);
 
@@ -117,23 +100,9 @@ class ExportSelectionController extends Controller
             return redirect()->back()->withErrors(['error' => 'Template not found']);
         }
 
-        $selectedColumnIds = $validated['columns'];
-        $selectedColumns = $template->columns()
-            ->whereIn('id', $selectedColumnIds)
-            ->get();
+        $selectedColumnIds = $this->filterColumns($validated['columns'], $template);
 
-        if ($selectedColumns->isEmpty()) {
-            return redirect()->back()->withErrors(['error' => 'No columns selected']);
-        }
-
-        $data = $this->prepareTaskExportData($task, $selectedColumns);
-
-        return $this->downloadExcel(
-            $data,
-            $selectedColumns,
-            "task-{$task->id}",
-            $validated['format']
-        );
+        return $service->exportCustomByTask($task, $validated['format'], $selectedColumnIds);
     }
 
     /**
@@ -163,13 +132,13 @@ class ExportSelectionController extends Controller
     /**
      * Store export selection and download file for type
      */
-    public function typeExport(Request $request, Type $type)
+    public function typeExport(Request $request, Type $type, ProjectExportService $service)
     {
         $this->authorize('export', $type);
 
         $validated = $request->validate([
             'columns' => 'required|array|min:1',
-            'columns.*' => 'required|string',
+            'columns.*' => 'required|integer',
             'format' => 'required|in:xlsx,csv,tsv',
         ]);
 
@@ -178,166 +147,19 @@ class ExportSelectionController extends Controller
             return redirect()->back()->withErrors(['error' => 'Template not found']);
         }
 
-        $selectedColumnIds = $validated['columns'];
-        $selectedColumns = $template->columns()
-            ->whereIn('id', $selectedColumnIds)
-            ->get();
+        $selectedColumnIds = $this->filterColumns($validated['columns'], $template);
 
-        if ($selectedColumns->isEmpty()) {
-            return redirect()->back()->withErrors(['error' => 'No columns selected']);
-        }
-
-        $data = $this->prepareTypeExportData($type, $selectedColumns, $request->user());
-
-        return $this->downloadExcel(
-            $data,
-            $selectedColumns,
-            "type-{$type->id}",
-            $validated['format']
-        );
+        return $service->exportCustomByType($type, $validated['format'], $selectedColumnIds, [], $request->user());
     }
 
-    /**
-     * Prepare project export data with selected columns
-     */
-    private function prepareExportData(Project $project, $selectedColumns)
+    private function filterColumns(array $columnIds, $template): array
     {
-        $columnKeys = $selectedColumns->pluck('key')->toArray();
-        $data = [];
-
-        // Add header row
-        $headerRow = [];
-        foreach ($selectedColumns as $column) {
-            $headerRow[] = $column->label;
-        }
-        $data[] = $headerRow;
-
-        // Add data rows
-        $projects = Project::where('template_id', $project->template_id)->get();
-
-        foreach ($projects as $proj) {
-            $row = [];
-            foreach ($columnKeys as $key) {
-                $row[] = $proj->{$key} ?? '';
-            }
-            $data[] = $row;
+        $allowed = $template->columns()->pluck('id')->all();
+        $filtered = array_values(array_intersect($columnIds, $allowed));
+        if (! $filtered) {
+            abort(422, 'No valid columns selected for export.');
         }
 
-        return $data;
-    }
-
-    /**
-     * Prepare task export data with selected columns
-     */
-    private function prepareTaskExportData(Task $task, $selectedColumns)
-    {
-        $columnKeys = $selectedColumns->pluck('key')->toArray();
-        $data = [];
-
-        // Add header row
-        $headerRow = [];
-        foreach ($selectedColumns as $column) {
-            $headerRow[] = $column->label;
-        }
-        $data[] = $headerRow;
-
-        return $data;
-    }
-
-    /**
-     * Prepare type export data with selected columns
-     */
-    private function prepareTypeExportData(Type $type, $selectedColumns, $user)
-    {
-        $columnKeys = $selectedColumns->pluck('key')->toArray();
-        $data = [];
-
-        // Add header row
-        $headerRow = [];
-        foreach ($selectedColumns as $column) {
-            $headerRow[] = $column->label;
-        }
-        $data[] = $headerRow;
-
-        // Add data rows for all projects of this type
-        $projects = Project::where('type_id', $type->id)
-            ->where('user_id', $user->id)
-            ->get();
-
-        foreach ($projects as $proj) {
-            $row = [];
-            foreach ($columnKeys as $key) {
-                $row[] = $proj->{$key} ?? '';
-            }
-            $data[] = $row;
-        }
-
-        return $data;
-    }
-
-    /**
-     * Generate and download Excel file
-     */
-    private function downloadExcel($data, $columns, $filename, $format)
-    {
-        $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
-
-        // Add data
-        foreach ($data as $rowIndex => $row) {
-            foreach ($row as $colIndex => $value) {
-                $sheet->setCellValueByColumnAndRow($colIndex + 1, $rowIndex + 1, $value);
-            }
-        }
-
-        // Style header row
-        $sheet->getStyle('1:1')->getFont()->setBold(true);
-        $sheet->getStyle('1:1')->getFill()->setFillType('solid')->getStartColor()->setARGB('FFE0E0E0');
-
-        // Auto-fit columns
-        foreach (range('A', $sheet->getHighestColumn()) as $col) {
-            $sheet->getColumnDimension($col)->setAutoSize(true);
-        }
-
-        // Save to temporary file
-        $tempFile = tempnam(sys_get_temp_dir(), 'excel_');
-        $extension = 'xlsx';
-
-        switch (strtolower($format)) {
-            case 'csv':
-                $writer = new Csv($spreadsheet);
-                $extension = 'csv';
-                break;
-            case 'tsv':
-                $writer = new Csv($spreadsheet);
-                $writer->setDelimiter("\t");
-                $extension = 'tsv';
-                break;
-            case 'xlsx':
-            default:
-                $writer = new Xlsx($spreadsheet);
-                break;
-        }
-
-        $writer->save($tempFile);
-
-        return response()->download($tempFile, "{$filename}.{$extension}", [
-            'Content-Type' => $this->getContentType($extension),
-            'Content-Disposition' => "attachment; filename=\"{$filename}.{$extension}\"",
-        ])->deleteFileAfterSend(true);
-    }
-
-    /**
-     * Get content type for file format
-     */
-    private function getContentType($extension)
-    {
-        $types = [
-            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'csv' => 'text/csv',
-            'tsv' => 'text/tab-separated-values',
-        ];
-
-        return $types[$extension] ?? 'application/octet-stream';
+        return $filtered;
     }
 }

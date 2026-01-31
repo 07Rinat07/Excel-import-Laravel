@@ -63,6 +63,7 @@ Route::middleware(['auth', 'not_blocked'])->group(function () {
     Route::get('/projects/{project}/export/{format}', [ProjectExportController::class, 'project'])->name('project.export');
 
     Route::get('/tasks', [TaskController::class, 'index'])->name('task.index');
+    Route::get('/tasks/{task}/status', [TaskController::class, 'status'])->name('task.status');
     Route::get('/tasks/{task}/failed_list', [TaskController::class, 'failedList'])->name('task.failed_list');
 
     // Task export selection routes

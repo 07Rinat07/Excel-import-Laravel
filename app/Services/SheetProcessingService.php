@@ -107,20 +107,37 @@ class SheetProcessingService
     public function getSheetStatistics(string $filePath, int $sheetIndex = 0): array
     {
         try {
-            $sheetName = $this->resolveSheetName($filePath, $sheetIndex);
-            $sheet = $this->loadSheetRows($filePath, $sheetName, 1, 1);
+            $reader = IOFactory::createReaderForFile($filePath);
+            $info = $reader->listWorksheetInfo($filePath);
+            $sheet = $info[$sheetIndex] ?? null;
+            if (! $sheet) {
+                return [];
+            }
 
-            $highestRow = $sheet->getHighestRow();
-            $highestColumn = $sheet->getHighestColumn();
+            $totalRows = (int) ($sheet['totalRows'] ?? 0);
+            $totalColumns = (int) ($sheet['totalColumns'] ?? 0);
 
             return [
-                'name' => $sheet->getTitle(),
-                'total_rows' => $highestRow,
-                'total_columns' => Coordinate::columnIndexFromString($highestColumn),
-                'has_data' => $highestRow > 1,
+                'name' => $sheet['worksheetName'] ?? ('Sheet '.($sheetIndex + 1)),
+                'total_rows' => $totalRows,
+                'total_columns' => $totalColumns,
+                'has_data' => $totalRows > 1,
             ];
         } catch (\Exception $e) {
             return [];
+        }
+    }
+
+    public function getHeaderRowIndex(string $filePath, int $sheetIndex = 0): int
+    {
+        try {
+            $sheetName = $this->resolveSheetName($filePath, $sheetIndex);
+            $sheet = $this->loadSheetRows($filePath, $sheetName, 1, 10);
+            [$headerRow] = $this->detectHeaderRow($sheet);
+
+            return $headerRow;
+        } catch (\Exception $e) {
+            return 1;
         }
     }
 

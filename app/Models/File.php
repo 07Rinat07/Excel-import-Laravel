@@ -19,7 +19,8 @@ class File extends Model
 
     public static function putAndCreate($dataFile)
     {
-        $path = Storage::disk('public')->put('files/', $dataFile);
+        $disk = config('imports.disk', 'public');
+        $path = Storage::disk($disk)->put('files/', $dataFile);
 
         return File::create([
             'path' => $path,

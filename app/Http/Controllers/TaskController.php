@@ -51,4 +51,13 @@ class TaskController extends Controller
             'templateColumns' => $templateColumns,
         ]);
     }
+
+    public function status(Request $request, Task $task)
+    {
+        $this->authorize('view', $task);
+
+        $task->loadMissing(['user', 'file', 'typeModel', 'template'])->loadCount('failedRows');
+
+        return new TaskResource($task);
+    }
 }
