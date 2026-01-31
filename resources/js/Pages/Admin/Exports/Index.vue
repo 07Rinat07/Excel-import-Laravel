@@ -27,6 +27,57 @@
                 </button>
             </div>
 
+            <div class="mt-5 grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr]">
+                <div>
+                    <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('admin.exportsPresetSelect') }}</label>
+                    <div class="mt-2 flex gap-2">
+                        <select v-model="selectedPresetId" class="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm" @change="applyPreset">
+                            <option value="">{{ $t('admin.exportsPresetPlaceholder') }}</option>
+                            <option v-for="preset in presets" :key="preset.id" :value="preset.id">
+                                {{ preset.name }}
+                            </option>
+                        </select>
+                        <button
+                            v-if="selectedPresetId"
+                            type="button"
+                            class="rounded-full border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-600"
+                            @click="deletePreset"
+                        >
+                            {{ $t('actions.delete') }}
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('admin.exportsPresetName') }}</label>
+                    <div class="mt-2 flex gap-2">
+                        <input
+                            v-model="presetName"
+                            type="text"
+                            class="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm"
+                            :placeholder="$t('admin.exportsPresetNamePlaceholder')"
+                        />
+                        <button
+                            type="button"
+                            class="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white"
+                            :disabled="presetName.trim() === '' || !canExport"
+                            @click="savePreset"
+                        >
+                            {{ $t('actions.save') }}
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-end">
+                    <button
+                        type="button"
+                        class="w-full rounded-full border border-slate-300 px-6 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700"
+                        :disabled="!canExport"
+                        @click="queueExport"
+                    >
+                        {{ $t('admin.exportsQueue') }}
+                    </button>
+                </div>
+            </div>
+
             <div class="mt-6 grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr_1fr_0.6fr]">
                 <div>
                     <label class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{{ $t('admin.exportsSourceLabel') }}</label>
@@ -178,6 +229,12 @@
                                 <span class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">{{ $t('admin.exportsTo') }}</span>
                                 <span class="text-slate-700 text-right">{{ item.file_name }}</span>
                             </div>
+                            <div v-if="item.download_url" class="flex items-center justify-between gap-3">
+                                <span class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">{{ $t('actions.download') }}</span>
+                                <a :href="item.download_url" class="text-sm font-semibold text-emerald-700 hover:text-emerald-900">
+                                    {{ $t('actions.download') }}
+                                </a>
+                            </div>
                             <div class="flex items-center justify-between gap-3">
                                 <span class="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-slate-400">{{ $t('labels.user') }}</span>
                                 <span class="text-slate-700 text-right">{{ item.user?.name || '—' }}</span>
@@ -213,7 +270,14 @@
                                         {{ item.status === 'success' ? $t('admin.exportsSuccess') : $t('admin.exportsFailed') }}
                                     </span>
                                 </td>
-                                <td class="py-4 text-slate-600">{{ item.created_at }}</td>
+                                <td class="py-4 text-slate-600">
+                                    <div class="flex items-center gap-3">
+                                        <span>{{ item.created_at }}</span>
+                                        <a v-if="item.download_url" :href="item.download_url" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900">
+                                            {{ $t('actions.download') }}
+                                        </a>
+                                    </div>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -241,6 +305,7 @@ export default {
         exports: Object,
         types: Array,
         tasks: Array,
+        presets: Array,
         users: Array,
     },
     data() {
@@ -252,6 +317,8 @@ export default {
             format: 'xlsx',
             selectedColumns: {},
             customLabels: {},
+            presetName: '',
+            selectedPresetId: '',
         };
     },
     computed: {
@@ -275,6 +342,9 @@ export default {
                 return false;
             }
             return this.currentColumns.every((column) => this.selectedColumns[column.id]);
+        },
+        selectedPreset() {
+            return this.presets.find((preset) => String(preset.id) === String(this.selectedPresetId));
         },
     },
     methods: {
@@ -332,6 +402,103 @@ export default {
 
             window.location.href = `${route('admin.exports.download')}?${params.toString()}`;
         },
+        queueExport() {
+            if (!this.canExport) {
+                return;
+            }
+
+            const payload = this.buildPayload();
+            this.$inertia.post(route('admin.exports.queue'), payload, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    this.$inertia.reload({ only: ['exports'] });
+                },
+            });
+        },
+        savePreset() {
+            if (!this.canExport || this.presetName.trim() === '') {
+                return;
+            }
+
+            const payload = {
+                name: this.presetName.trim(),
+                ...this.buildPayload(),
+            };
+
+            this.$inertia.post(route('admin.exports.presets.store'), payload, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    this.presetName = '';
+                    this.selectedPresetId = '';
+                    this.$inertia.reload({ only: ['presets'] });
+                },
+            });
+        },
+        deletePreset() {
+            if (!this.selectedPresetId) {
+                return;
+            }
+
+            if (!confirm(this.$t('admin.exportsPresetDeleteConfirm'))) {
+                return;
+            }
+
+            this.$inertia.delete(route('admin.exports.presets.destroy', this.selectedPresetId), {
+                preserveScroll: true,
+                onSuccess: () => {
+                    this.selectedPresetId = '';
+                    this.$inertia.reload({ only: ['presets'] });
+                },
+            });
+        },
+        applyPreset() {
+            if (!this.selectedPreset) {
+                return;
+            }
+
+            const preset = this.selectedPreset;
+            this.sourceType = preset.source_type;
+            this.sourceId = preset.source_id;
+            this.format = preset.format || 'xlsx';
+            this.userId = preset.filter_user_id || '';
+            this.sheetName = preset.sheet_name || '';
+
+            this.$nextTick(() => {
+                const nextSelected = {};
+                (preset.columns || []).forEach((id) => {
+                    nextSelected[id] = true;
+                });
+                this.selectedColumns = nextSelected;
+                this.customLabels = { ...(preset.labels || {}) };
+            });
+        },
+        buildPayload() {
+            const payload = {
+                source_type: this.sourceType,
+                source_id: this.sourceId,
+                format: this.format,
+                sheet_name: this.sheetName.trim() !== '' ? this.sheetName.trim() : null,
+            };
+
+            if (this.userId && this.sourceType === 'type') {
+                payload.user_id = this.userId;
+            }
+
+            payload.columns = [];
+            payload.labels = {};
+            this.currentColumns.forEach((column) => {
+                if (!this.selectedColumns[column.id]) {
+                    return;
+                }
+                payload.columns.push(column.id);
+                const label = (this.customLabels[column.id] || '').trim();
+                if (label !== '') {
+                    payload.labels[column.id] = label;
+                }
+            });
+
+            return payload;
+        },
     },
     watch: {
         sourceType() {
@@ -339,6 +506,7 @@ export default {
             this.selectedColumns = {};
             this.customLabels = {};
             this.userId = '';
+            this.selectedPresetId = '';
         },
         sourceId() {
             this.selectedColumns = {};

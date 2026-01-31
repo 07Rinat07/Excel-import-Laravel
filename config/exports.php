@@ -6,4 +6,6 @@ return [
     'view_allowlist' => [
         'exports.test-report',
     ],
+    // Disk for stored/queued exports.
+    'disk' => env('EXPORTS_DISK', 'exports'),
 ];

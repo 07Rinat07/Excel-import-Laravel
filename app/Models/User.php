@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements MustVerifyEmailContract
 {
-    use HasApiTokens, HasFactory, MustVerifyEmail, Notifiable;
+    use HasApiTokens, HasFactory, MustVerifyEmail, Notifiable, HasRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -49,6 +50,10 @@ class User extends Authenticatable implements MustVerifyEmailContract
 
     public function isAdmin(): bool
     {
+        if ($this->hasRole('admin')) {
+            return true;
+        }
+
         return (bool) $this->is_admin;
     }
 }

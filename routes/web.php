@@ -80,6 +80,10 @@ Route::middleware(['auth', 'not_blocked'])->group(function () {
 Route::middleware(['auth', 'not_blocked', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/exports', [\App\Http\Controllers\Admin\ExportController::class, 'index'])->name('exports.index');
     Route::get('/exports/download', [\App\Http\Controllers\Admin\ExportController::class, 'download'])->name('exports.download');
+    Route::get('/exports/download/{id}', [\App\Http\Controllers\Admin\ExportController::class, 'downloadFile'])->name('exports.download_file');
+    Route::post('/exports/queue', [\App\Http\Controllers\Admin\ExportController::class, 'queue'])->name('exports.queue');
+    Route::post('/exports/presets', [\App\Http\Controllers\Admin\ExportController::class, 'storePreset'])->name('exports.presets.store');
+    Route::delete('/exports/presets/{preset}', [\App\Http\Controllers\Admin\ExportController::class, 'destroyPreset'])->name('exports.presets.destroy');
     Route::get('/types', [\App\Http\Controllers\Admin\TypeController::class, 'index'])->name('types.index');
     Route::post('/types', [\App\Http\Controllers\Admin\TypeController::class, 'store'])->name('types.store');
     Route::patch('/types/{type}', [\App\Http\Controllers\Admin\TypeController::class, 'update'])->name('types.update');

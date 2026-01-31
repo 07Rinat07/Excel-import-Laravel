@@ -35,7 +35,8 @@ class ProcessExportJob implements ShouldQueue
         $filename = $this->filenamePrefix . '.' . $exportService->normalizeFormat($this->format);
         $writerType = $exportService->writerType($this->format);
 
-        Excel::store(new ProjectValuesViewExport($this->view, $this->data, $this->columnWidths), $filename, 'public', $writerType);
+        $disk = config('exports.disk', 'exports');
+        Excel::store(new ProjectValuesViewExport($this->view, $this->data, $this->columnWidths), $filename, $disk, $writerType);
 
         // Optionally, log the export or notify the user
         // For example: ExportLog::create([...]);

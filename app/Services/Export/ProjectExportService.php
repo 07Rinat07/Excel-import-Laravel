@@ -59,6 +59,15 @@ class ProjectExportService
         return $this->downloadCustomQuery($projectsQuery, $template, $format, "project-{$project->id}-custom", $columnIds, $labels);
     }
 
+    public function storeCustomByProject(Project $project, string $format, array $columnIds, array $labels = [], ?string $path = null): string
+    {
+        $template = $this->resolveTemplate($project->template_id, $project->type_id);
+        $projectsQuery = Project::query()
+            ->whereKey($project->id);
+
+        return $this->storeCustomQuery($projectsQuery, $template, $format, "project-{$project->id}-custom", $columnIds, $labels, $path);
+    }
+
     public function exportByTask(Task $task, string $format, ?string $sheetName = null, ?int $sheetIndex = null): BinaryFileResponse
     {
         $template = $this->resolveTemplate($task->template_id, $task->type_id);
@@ -94,6 +103,17 @@ class ProjectExportService
         return $this->downloadCustomQuery($projectsQuery, $template, $format, "task-{$task->id}-custom", $columnIds, $labels);
     }
 
+    public function storeCustomByTask(Task $task, string $format, array $columnIds, array $labels = [], ?string $sheetName = null, ?int $sheetIndex = null, ?string $path = null): string
+    {
+        $template = $this->resolveTemplate($task->template_id, $task->type_id);
+        $projectsQuery = Project::query()
+            ->where('task_id', $task->id)
+            ->latest('id');
+        $projectsQuery = $this->applySheetFilter($projectsQuery, $sheetName, $sheetIndex);
+
+        return $this->storeCustomQuery($projectsQuery, $template, $format, "task-{$task->id}-custom", $columnIds, $labels, $path);
+    }
+
     public function exportCustomByType(Type $type, string $format, array $columnIds, array $labels = [], ?User $user = null, ?int $userId = null, ?string $sheetName = null, ?int $sheetIndex = null): BinaryFileResponse
     {
         $template = $this->resolveTemplate(null, $type->id);
@@ -105,6 +125,19 @@ class ProjectExportService
         $projectsQuery = $this->applySheetFilter($projectsQuery, $sheetName, $sheetIndex);
 
         return $this->downloadCustomQuery($projectsQuery, $template, $format, "type-{$type->id}-custom", $columnIds, $labels);
+    }
+
+    public function storeCustomByType(Type $type, string $format, array $columnIds, array $labels = [], ?User $user = null, ?int $userId = null, ?string $sheetName = null, ?int $sheetIndex = null, ?string $path = null): string
+    {
+        $template = $this->resolveTemplate(null, $type->id);
+        $projectsQuery = Project::query()
+            ->where('type_id', $type->id)
+            ->latest('id');
+
+        $projectsQuery = $this->applyUserFilter($projectsQuery, $user, $userId);
+        $projectsQuery = $this->applySheetFilter($projectsQuery, $sheetName, $sheetIndex);
+
+        return $this->storeCustomQuery($projectsQuery, $template, $format, "type-{$type->id}-custom", $columnIds, $labels, $path);
     }
 
     private function resolveTemplate(?int $templateId, ?int $typeId): ExcelTemplate
@@ -142,25 +175,31 @@ class ProjectExportService
         return $this->downloadQueryWithColumns($query, $orderedColumns, $orderedColumns->pluck('id')->all(), $format, $prefix, $labels);
     }
 
+    private function storeCustomQuery(Builder $query, ExcelTemplate $template, string $format, string $prefix, array $columnIds, array $labels, ?string $path = null): string
+    {
+        $columnsById = $template->columns()->whereIn('id', $columnIds)->get()->keyBy('id');
+        $orderedColumns = collect($columnIds)
+            ->map(fn ($id) => $columnsById->get($id))
+            ->filter()
+            ->values();
+
+        return $this->storeQueryWithColumns(
+            $query,
+            $orderedColumns,
+            $orderedColumns->pluck('id')->all(),
+            $format,
+            $prefix,
+            $labels,
+            null,
+            $path
+        );
+    }
+
     private function downloadQueryWithColumns(Builder $query, Collection $columns, array $columnIds, string $format, string $prefix, array $labels = []): BinaryFileResponse
     {
-        $filename = $prefix.'.'.$this->normalizeFormat($format);
-        $writerType = $this->writerType($format);
+        [$export, $filename, $writerType] = $this->prepareQueryExport($query, $columns, $columnIds, $format, $prefix, $labels);
 
-        if ($this->supportsMultipleSheets($format)) {
-            $sheets = $this->buildQuerySheets($query, $columns, $columnIds, $labels);
-            if (count($sheets) > 1) {
-                return Excel::download(new ProjectValuesMultiSheetQueryExport($sheets), $filename, $writerType);
-            }
-        }
-
-        $query = $this->applyValuesWith($query, $columnIds);
-
-        return Excel::download(
-            new ProjectValuesQueryExport($query, $columns, $labels),
-            $filename,
-            $writerType
-        );
+        return Excel::download($export, $filename, $writerType);
     }
 
     private function applyValuesWith(Builder $query, array $columnIds): Builder
@@ -168,6 +207,42 @@ class ProjectExportService
         return $query->with(['values' => function ($valueQuery) use ($columnIds) {
             $valueQuery->whereIn('template_column_id', $columnIds);
         }]);
+    }
+
+    private function prepareQueryExport(Builder $query, Collection $columns, array $columnIds, string $format, string $prefix, array $labels = []): array
+    {
+        $filename = $prefix.'.'.$this->normalizeFormat($format);
+        $writerType = $this->writerType($format);
+
+        if ($this->supportsMultipleSheets($format)) {
+            $sheets = $this->buildQuerySheets($query, $columns, $columnIds, $labels);
+            if (count($sheets) > 1) {
+                return [new ProjectValuesMultiSheetQueryExport($sheets), $filename, $writerType];
+            }
+        }
+
+        $query = $this->applyValuesWith($query, $columnIds);
+
+        return [new ProjectValuesQueryExport($query, $columns, $labels), $filename, $writerType];
+    }
+
+    private function storeQueryWithColumns(
+        Builder $query,
+        Collection $columns,
+        array $columnIds,
+        string $format,
+        string $prefix,
+        array $labels = [],
+        ?string $disk = null,
+        ?string $path = null
+    ): string {
+        [$export, $filename, $writerType] = $this->prepareQueryExport($query, $columns, $columnIds, $format, $prefix, $labels);
+        $targetDisk = $disk ?: config('exports.disk', 'exports');
+        $targetPath = $path ?: $filename;
+
+        Excel::store($export, $targetPath, $targetDisk, $writerType);
+
+        return $targetPath;
     }
 
     public function normalizeFormat(string $format): string
