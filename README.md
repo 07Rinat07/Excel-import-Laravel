@@ -100,7 +100,10 @@ Laravel-приложение для импорта файлов XLSX/XLS/XLSM/CS
 * Mailhog: `http://localhost:8025`
 * Документация Swagger API: `http://localhost:8000/api/documentation`
 
-4) Запустите тесты внутри Docker:
+4) Сгенерируйте Swagger/OpenAPI внутри Docker (по необходимости):
+* `docker compose exec app php artisan l5-swagger:generate`
+
+5) Запустите тесты внутри Docker:
 * `docker compose exec app ./vendor/bin/phpunit`
 
 Примечание: при изменении лимитов загрузки (например, размер файла) требуется пересборка контейнера `app` и `queue`.

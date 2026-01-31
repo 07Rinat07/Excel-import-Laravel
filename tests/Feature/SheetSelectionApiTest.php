@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\ExcelTemplate;
 use App\Models\ExcelTemplateColumn;
 use App\Models\File;
+use App\Models\Task;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -46,6 +47,12 @@ class SheetSelectionApiTest extends TestCase
             'path' => 'files/sheet-test.xlsx',
             'mime_type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'title' => 'sheet-test.xlsx',
+        ]);
+
+        Task::create([
+            'file_id' => $file->id,
+            'user_id' => $user->id,
+            'status' => \App\Models\Task::STATUS_PENDING,
         ]);
 
         $template = ExcelTemplate::factory()->create(['created_by' => $user->id]);
